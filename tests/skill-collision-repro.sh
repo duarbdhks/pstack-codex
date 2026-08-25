@@ -94,12 +94,12 @@ quad_bad=""
 # Each panel skill states the quad on its one line naming the fourth slug.
 for name in arena architect how interrogate; do
   skill="$repo/plugins/pstack/skills/$name/SKILL.md"
-  n="$(grep -Fc 'claude-sonnet-4-6' "$skill" || true)"
+  n="$(grep -Fc 'claude-haiku-4-5' "$skill" || true)"
   if [ "$n" != "1" ]; then
     quad_bad="$quad_bad$skill: expected exactly 1 default-quad line, found $n"$'\n'
     continue
   fi
-  got="$(grep -F 'claude-sonnet-4-6' "$skill" | quad_of)"
+  got="$(grep -F 'claude-haiku-4-5' "$skill" | quad_of)"
   [ "$got" = "$canon_quad" ] || quad_bad="$quad_bad$skill: [$got] != [$canon_quad]"$'\n'
 done
 # The setup-pstack role rows must all carry the same quad (excludes the line 24
