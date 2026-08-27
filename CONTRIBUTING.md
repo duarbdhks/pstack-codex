@@ -17,13 +17,16 @@ Every substitution is recorded per-skill in [CHANGES.md](CHANGES.md). If you add
 
 ## Before you open a PR
 
-Run the invariant script:
+Run the generator, then the invariant script:
 
 ```shell
+bun tools/generate.mjs
 bash tests/skill-collision-repro.sh
 ```
 
-It checks plugin layout, frontmatter flags, version parity across the three manifests, and that the default model quad is identical everywhere it appears. The last check is behavioral: it needs the `claude` CLI and API access and makes one haiku call. CI runs everything except that leg via `SKIP_BEHAVIORAL=1`, so run it unflagged at least once before a release.
+The generator stamps the root `VERSION` into the three plugin manifests, asserts `CHANGES.md` has a heading for that version, and validates the Codex marketplace pointer. CI reruns it and fails on any resulting diff, so commit whatever it changes.
+
+The invariant script checks plugin layout, frontmatter flags, and that the default model quad is identical everywhere it appears. The last check is behavioral: it needs the `claude` CLI and API access and makes one haiku call. CI runs everything except that leg via `SKIP_BEHAVIORAL=1`, so run it unflagged at least once before a release.
 
 If you touched `skills/poteto-mode/scripts/`:
 
@@ -46,7 +49,7 @@ uvx zizmor@1.29.0 --persona pedantic --min-severity low --collect all -- .
 
 - **A `plugins/pstack/commands/` directory.** Claude Code renders commands and user-invocable skills in the same slash menu, so a trampoline paired with its skill duplicates every `/pstack:<name>` row ([#22](https://github.com/michael-denyer/pstack-claude/issues/22)). Codex stubs live in `plugins/pstack/.codex-plugin/prompts/`. An upstream sync will try to reintroduce `commands/`; move any new stubs across.
 - **`disable-model-invocation` in a skill's frontmatter.** On a skill it makes the Skill tool refuse the invocation outright, which breaks the SessionStart mandate. The `principle-*` leaves use `user-invocable: false` instead.
-- **A version bump in only some manifests.** The version string is duplicated in `plugins/pstack/.claude-plugin/plugin.json`, `plugins/pstack/.codex-plugin/plugin.json`, and `.claude-plugin/marketplace.json`. All three move together.
+- **Stale generated output.** The `Generated files current` job reruns `bun tools/generate.mjs` and fails on any diff. Editing `VERSION` without regenerating, hand-editing a manifest's `version` field, or bumping without a matching `CHANGES.md` heading all land here.
 - **An action pinned to a tag.** Use the full 40-character commit SHA with a version comment. A mutable tag can be force-pushed into our runners.
 
 ## Dependency updates
@@ -61,7 +64,7 @@ If you bump a dependency by hand, run `bun install` and commit the resulting `bu
 
 Plugin auto-update installs **by version number**, not by tracking `main`. A skill fix merged without a version bump is inert on every installed copy, because the updater sees the same version it already has and does nothing.
 
-So: any PR that changes skill behavior either bumps the version itself or is followed by a release PR that does. Bump all three manifests, add a `CHANGES.md` entry describing what changed and why, and run the full invariant script (including the behavioral leg) before merging.
+So: any PR that changes skill behavior either bumps the version itself or is followed by a release PR that does. The bump is three steps: edit the root `VERSION` file, add a `CHANGES.md` entry under a `## <version>` heading describing what changed and why, and run `bun tools/generate.mjs` to stamp the manifests. Forgetting any of the three fails CI. Run the full invariant script (including the behavioral leg) before merging.
 
 ## Commit and PR style
 

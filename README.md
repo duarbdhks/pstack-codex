@@ -75,7 +75,9 @@ Unverified relative to Codex: the Codex path above is confirmed on a live sessio
 │   ├── .codex-plugin/prompts/        # 31 slash command stubs (Codex only; link into ~/.codex/prompts)
 │   ├── hooks/                        # SessionStart auto-fire: injects the poteto-mode mandate (Claude Code only)
 │   └── agents/                       # Claude subagents: poteto-agent, comment-sicko (Codex routes via codex-tools.md)
-├── tests/skill-collision-repro.sh    # layout, flag, version, and quad invariants (needs claude CLI)
+├── tests/skill-collision-repro.sh    # layout, flag, and quad invariants (needs claude CLI)
+├── tools/generate.mjs                # stamps VERSION into the manifests; validates cross-file contracts
+├── VERSION                           # canonical plugin version (single source; manifests are stamped)
 ├── LICENSE                           # pstack upstream MIT
 ├── LICENSE-cursor-team-kit           # cursor-team-kit upstream MIT
 ├── LICENSE-superpowers               # superpowers upstream MIT (hook runner)
@@ -104,7 +106,7 @@ Verified on a live Codex session installed via the symlinks: the user-facing ski
 
 Two workflows run on every pull request and push to `main`.
 
-`ci.yml` runs three jobs: the static plugin invariants (`tests/skill-collision-repro.sh` under `SKIP_BEHAVIORAL=1`, since the behavioral leg needs the `claude` CLI and API access), the vendored bun tooling (`bun install --frozen-lockfile`, `bun run typecheck`, `bun test orch watch-pr`), and `shellcheck` over every `.sh` file.
+`ci.yml` runs four jobs: the static plugin invariants (`tests/skill-collision-repro.sh` under `SKIP_BEHAVIORAL=1`, since the behavioral leg needs the `claude` CLI and API access), a generated-files check (`bun tools/generate.mjs` followed by `git diff --exit-code`, so a `VERSION` bump that skips regeneration or the `CHANGES.md` entry fails the build), the vendored bun tooling (`bun install --frozen-lockfile`, `bun run typecheck`, `bun test orch watch-pr`), and `shellcheck` over every `.sh` file.
 
 `security.yml` runs `osv-scanner` against the lockfiles and fails the build if no lockfile was found, because an empty scan reads exactly like a clean one. It also rejects any action reference not pinned to a full 40-character commit SHA. It runs weekly on top of the per-PR trigger, so a CVE published after a merge still surfaces. `zizmor` audits the workflows themselves for template injection, over-broad permissions, and credential persistence.
 

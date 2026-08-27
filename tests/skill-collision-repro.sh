@@ -8,9 +8,11 @@
 # future upstream sync from reintroducing plugins/pstack/commands/.
 #
 # This also enforces the static maintenance invariants from CHANGES.md: the
-# principle-* leaf flags, version parity across the three manifests, and the
-# default model quad's identity across the panel skills and setup-pstack. The
-# static checks need no CLI; only the behavioral leg below does.
+# principle-* leaf flags and the default model quad's identity across the panel
+# skills and setup-pstack. The static checks need no CLI; only the behavioral
+# leg below does. (Version parity across the manifests is no longer checked
+# here: tools/generate.mjs stamps all three from the root VERSION file, and CI
+# regenerates and diffs, so a partial bump cannot exist on a green build.)
 #
 # Manual test: the behavioral leg needs the claude CLI and API access; one haiku call.
 set -euo pipefail
@@ -77,19 +79,6 @@ if [ -n "$bad_principle" ]; then
   fail=1
 else
   note "ok: all principle-* leaves carry user-invocable: false"
-fi
-
-# Static invariant (CHANGES maintenance note): the plugin version string is
-# duplicated across three manifests and must move together on a bump.
-verof() { { grep -m1 '"version"' "$1" || true; } | sed -E 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/'; }
-vc="$(verof "$repo/plugins/pstack/.claude-plugin/plugin.json")"
-vx="$(verof "$repo/plugins/pstack/.codex-plugin/plugin.json")"
-vm="$(verof "$repo/.claude-plugin/marketplace.json")"
-if [ -n "$vc" ] && [ "$vc" = "$vx" ] && [ "$vc" = "$vm" ]; then
-  note "ok: plugin version matches across the 3 manifests ($vc)"
-else
-  note "FAIL: plugin version differs across manifests: claude-plugin=$vc codex-plugin=$vx marketplace=$vm"
-  fail=1
 fi
 
 # Static invariant (CHANGES maintenance note): the default model quad is duplicated
