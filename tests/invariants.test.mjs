@@ -10,6 +10,21 @@ import { join } from "node:path";
 
 const script = join(import.meta.dir, "skill-collision-repro.sh");
 
+const CODEX_DISPATCH_CONTRACT = `# Codex tools
+
+<!-- BEGIN CODEX SPAWN CONTRACT -->
+\`\`\`js
+spawn_agent({
+  agent_type: "default",
+  task_name: "<semantic role>",
+  model: "<configured model>",
+  reasoning_effort: "<configured effort>",
+  fork_turns: "none",
+});
+\`\`\`
+<!-- END CODEX SPAWN CONTRACT -->
+`;
+
 function skill(dir, name, front) {
   mkdirSync(join(dir, "plugins/pstack/skills", name), { recursive: true });
   writeFileSync(
@@ -18,10 +33,17 @@ function skill(dir, name, front) {
   );
 }
 
+function codexTools(dir, text = CODEX_DISPATCH_CONTRACT) {
+  const path = join(dir, "plugins/pstack/skills/poteto-mode/references/codex-tools.md");
+  mkdirSync(join(path, ".."), { recursive: true });
+  writeFileSync(path, text);
+}
+
 function fixture(mutate = () => {}) {
   const dir = mkdtempSync(join(tmpdir(), "invariants-"));
   skill(dir, "good", "");
   skill(dir, "principle-good", "user-invocable: false\n");
+  codexTools(dir);
   mutate(dir);
   return dir;
 }
@@ -76,5 +98,26 @@ describe("skill-collision-repro.sh static invariants", () => {
       "---\nname: good\ndescription: fixture\n---\n\nNever set disable-model-invocation: true on a skill.\n",
     );
     expect(run(dir).code).toBe(0);
+  });
+
+  test("a semantic Codex agent type fails", () => {
+    const dir = fixture((d) => codexTools(d, CODEX_DISPATCH_CONTRACT.replace('"default"', '"reviewer"')));
+    const { code, out } = run(dir);
+    expect(code).toBe(1);
+    expect(out).toContain("FAIL: Codex pstack dispatch uses the default agent with explicit policy");
+    expect(out).toContain("agent_type must be default");
+  });
+
+  test.each([
+    ["task name", '  task_name: "<semantic role>",\n', "task_name must carry the semantic role"],
+    ["model", '  model: "<configured model>",\n', "model must be explicit"],
+    ["reasoning effort", '  reasoning_effort: "<configured effort>",\n', "reasoning_effort must be explicit"],
+    ["fork turns", '  fork_turns: "none",\n', "fork_turns must be explicit"],
+  ])("a missing Codex %s fails", (_name, field, expected) => {
+    const dir = fixture((d) => codexTools(d, CODEX_DISPATCH_CONTRACT.replace(field, "")));
+    const { code, out } = run(dir);
+    expect(code).toBe(1);
+    expect(out).toContain("FAIL: Codex pstack dispatch uses the default agent with explicit policy");
+    expect(out).toContain(expected);
   });
 });

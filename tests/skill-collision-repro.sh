@@ -76,9 +76,37 @@ principle_leaves_hidden() {
   return 0
 }
 
+codex_dispatch_uses_default_agent() {
+  local mapping block
+  mapping="$repo/plugins/pstack/skills/poteto-mode/references/codex-tools.md"
+  if [ ! -f "$mapping" ]; then
+    echo "$mapping (missing)"
+    return 0
+  fi
+
+  block="$(sed -n '/<!-- BEGIN CODEX SPAWN CONTRACT -->/,/<!-- END CODEX SPAWN CONTRACT -->/p' "$mapping")"
+  [ -n "$block" ] || {
+    echo "$mapping (missing Codex spawn contract)"
+    return 0
+  }
+
+  printf '%s\n' "$block" | grep -Fq 'agent_type: "default"' ||
+    echo "$mapping (agent_type must be default)"
+  printf '%s\n' "$block" | grep -Fq 'task_name: "<semantic role>"' ||
+    echo "$mapping (task_name must carry the semantic role)"
+  printf '%s\n' "$block" | grep -Fq 'model: "<configured model>"' ||
+    echo "$mapping (model must be explicit)"
+  printf '%s\n' "$block" | grep -Fq 'reasoning_effort: "<configured effort>"' ||
+    echo "$mapping (reasoning_effort must be explicit)"
+  printf '%s\n' "$block" | grep -Fq 'fork_turns: "none"' ||
+    echo "$mapping (fork_turns must be explicit)"
+  return 0
+}
+
 check "no plugins/pstack/commands/ directory" no_commands_dir
 check "no skill carries disable-model-invocation: true" no_disable_model_invocation
 check "principle-* leaves carry user-invocable: false and not disable-model-invocation" principle_leaves_hidden
+check "Codex pstack dispatch uses the default agent with explicit policy" codex_dispatch_uses_default_agent
 
 # Behavioral leg: a command-less plugin still serves the user-typed /plugin:name
 # via the skill alone. This is the assumption that lets pstack live without
