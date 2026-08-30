@@ -77,29 +77,43 @@ principle_leaves_hidden() {
 }
 
 codex_dispatch_uses_default_agent() {
-  local mapping block
+  local mapping violations
   mapping="$repo/plugins/pstack/skills/poteto-mode/references/codex-tools.md"
   if [ ! -f "$mapping" ]; then
     echo "$mapping (missing)"
     return 0
   fi
 
-  block="$(sed -n '/<!-- BEGIN CODEX SPAWN CONTRACT -->/,/<!-- END CODEX SPAWN CONTRACT -->/p' "$mapping")"
-  [ -n "$block" ] || {
-    echo "$mapping (missing Codex spawn contract)"
-    return 0
-  }
-
-  printf '%s\n' "$block" | grep -Fq 'agent_type: "default"' ||
-    echo "$mapping (agent_type must be default)"
-  printf '%s\n' "$block" | grep -Fq 'task_name: "<semantic role>"' ||
-    echo "$mapping (task_name must carry the semantic role)"
-  printf '%s\n' "$block" | grep -Fq 'model: "<configured model>"' ||
-    echo "$mapping (model must be explicit)"
-  printf '%s\n' "$block" | grep -Fq 'reasoning_effort: "<configured effort>"' ||
-    echo "$mapping (reasoning_effort must be explicit)"
-  printf '%s\n' "$block" | grep -Fq 'fork_turns: "none"' ||
-    echo "$mapping (fork_turns must be explicit)"
+  violations="$(bun -e '
+    const text = await Bun.file(process.argv[1]).text();
+    const match = text.match(/^## Codex spawn contract\n\n```json\n([\s\S]*?)\n```$/m);
+    if (!match) {
+      console.log("missing Codex spawn contract");
+      process.exit(0);
+    }
+    let contract;
+    try {
+      contract = JSON.parse(match[1]);
+    } catch {
+      console.log("Codex spawn contract must be valid JSON");
+      process.exit(0);
+    }
+    const expected = {
+      agent_type: ["default", "agent_type must be default"],
+      task_name: ["<semantic role>", "task_name must carry the semantic role"],
+      model: ["<configured model>", "model must be explicit"],
+      reasoning_effort: ["<configured effort>", "reasoning_effort must be explicit"],
+      fork_turns: ["none", "fork_turns must be explicit"],
+    };
+    for (const [field, [value, message]] of Object.entries(expected)) {
+      if (contract[field] !== value) console.log(message);
+    }
+  ' "$mapping")"
+  [ -z "$violations" ] ||
+    printf '%s\n' "$violations" |
+      while IFS= read -r violation; do
+        printf '%s (%s)\n' "$mapping" "$violation"
+      done
   return 0
 }
 

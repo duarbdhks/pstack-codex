@@ -2,6 +2,10 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.16 — keep Codex pstack effort policy on the default agent
+
+Codex pstack dispatches now use the `default` agent type with explicit `model` and `reasoning_effort` values. Semantic roles stay in `task_name` and the prompt, so fixed Codex profiles such as `reviewer` cannot replace the user's role policy. `codex-tools.md` owns the request shape, and the invariant fixtures reject semantic agent types and missing policy fields. Generic dispatch remains the supported route; this release does not restore the fixed-profile routing closed in PR #20.
+
 ## 0.9.15 — retire Opus 4.8 from the model defaults
 
 `plugins/pstack/models.json` no longer names `claude-opus-4-8` as a default. Every single-model role that used it (`feature, refactoring`, `judgment and prose`, `how explorer`, `how explainer`, `why investigators`, `why synthesizer`, `reflect tooling`, `reflect judgment, divergent, synthesizer`, `swarm workers`, and the single-role default) now runs `claude-opus-5`. The three roles that carry the hardest code changes (`bug-fix`, `perf-issue`, `hillclimb`) move to `claude-fable-5`, matching the existing `strongest judgment` row. `claude-haiku-4-5` leaves the four panels (`how critics`, `arena runners`, `architect runners`, `interrogate reviewers`), so each runs the three-model panel `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`; the `models.json` key is now `panel`, not `panelQuad`. The generator restamped the `## Models` sections, the interrogate reviewer table, and the interrogate menu row; the README substitution table rows for the Cursor `claude-opus-4-X-thinking-xhigh` variant and the panel quad now state the current defaults. Opus 4.8 stays in the available-model list for `/setup-pstack` overrides.

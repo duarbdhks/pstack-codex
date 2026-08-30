@@ -12,17 +12,18 @@ const script = join(import.meta.dir, "skill-collision-repro.sh");
 
 const CODEX_DISPATCH_CONTRACT = `# Codex tools
 
-<!-- BEGIN CODEX SPAWN CONTRACT -->
-\`\`\`js
-spawn_agent({
-  agent_type: "default",
-  task_name: "<semantic role>",
-  model: "<configured model>",
-  reasoning_effort: "<configured effort>",
-  fork_turns: "none",
-});
+## Codex spawn contract
+
+\`\`\`json
+{
+  "agent_type": "default",
+  "task_name": "<semantic role>",
+  "model": "<configured model>",
+  "reasoning_effort": "<configured effort>",
+  "fork_turns": "none",
+  "prompt": "<complete task, constraints, and file pointers>"
+}
 \`\`\`
-<!-- END CODEX SPAWN CONTRACT -->
 `;
 
 function skill(dir, name, front) {
@@ -109,10 +110,10 @@ describe("skill-collision-repro.sh static invariants", () => {
   });
 
   test.each([
-    ["task name", '  task_name: "<semantic role>",\n', "task_name must carry the semantic role"],
-    ["model", '  model: "<configured model>",\n', "model must be explicit"],
-    ["reasoning effort", '  reasoning_effort: "<configured effort>",\n', "reasoning_effort must be explicit"],
-    ["fork turns", '  fork_turns: "none",\n', "fork_turns must be explicit"],
+    ["task name", '  "task_name": "<semantic role>",\n', "task_name must carry the semantic role"],
+    ["model", '  "model": "<configured model>",\n', "model must be explicit"],
+    ["reasoning effort", '  "reasoning_effort": "<configured effort>",\n', "reasoning_effort must be explicit"],
+    ["fork turns", '  "fork_turns": "none",\n', "fork_turns must be explicit"],
   ])("a missing Codex %s fails", (_name, field, expected) => {
     const dir = fixture((d) => codexTools(d, CODEX_DISPATCH_CONTRACT.replace(field, "")));
     const { code, out } = run(dir);
