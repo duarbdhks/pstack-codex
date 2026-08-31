@@ -8,7 +8,7 @@ menu-description: walk through how a subsystem works
 
 Explore the codebase to answer "how does X work?" questions. Produce clear architectural explanations at the level of a senior engineer onboarding onto a subsystem. Enough to build a working mental model, not annotated source code.
 
-**Platform note.** On Codex or another non-Claude runtime, the Claude tool names and `claude-*` slugs named below are Claude defaults. Resolve them via [`codex-tools.md`](../poteto-mode/references/codex-tools.md).
+**Platform note.** Claude tool names below stay as written on every runtime; resolve them via [`codex-tools.md`](../poteto-mode/references/codex-tools.md). Model slugs are the Codex+Grok catalog; on Claude Code substitute the sidecar catalog via `/setup-pstack`.
 
 Two modes:
 
@@ -138,8 +138,8 @@ Present the explanation first (from Step 1), then the critique verdict below it.
 
 ## Models
 
-Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
+Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` (Claude Code) or `~/.codex/pstack-models.md` (Codex) overrides each at runtime; see `/setup-pstack`.
 
-- how explorer: `claude-opus-5`
-- how explainer: `claude-opus-5`
-- how critics: `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`
+- how explorer: `gpt-5.6-luna`
+- how explainer: `gpt-5.6-sol`
+- how critics: `gpt-5.6-sol`, `gpt-5.6-luna`, `grok-4.6`

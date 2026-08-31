@@ -8,7 +8,7 @@ menu-description: capture a long task's lessons as a skill edit
 
 Mine the current conversation for durable learnings, then route them into skill edits.
 
-**Platform note.** On Codex or another non-Claude runtime, the Claude tool names, `claude-*` slugs, and Claude built-in skills named below are Claude defaults. Resolve them via [`codex-tools.md`](../poteto-mode/references/codex-tools.md).
+**Platform note.** Claude tool names and built-in skills below stay as written on every runtime; resolve them via [`codex-tools.md`](../poteto-mode/references/codex-tools.md). Model slugs are the Codex+Grok catalog; on Claude Code substitute the sidecar catalog via `/setup-pstack`.
 
 ## When to invoke
 
@@ -80,7 +80,7 @@ Short list, no preamble:
 
 ## Models
 
-Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
+Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` (Claude Code) or `~/.codex/pstack-models.md` (Codex) overrides each at runtime; see `/setup-pstack`.
 
-- reflect tooling: `claude-opus-5`
-- reflect judgment, divergent, synthesizer: `claude-opus-5`
+- reflect tooling: `gpt-5.6-luna`
+- reflect judgment, divergent, synthesizer: `gpt-5.6-sol`

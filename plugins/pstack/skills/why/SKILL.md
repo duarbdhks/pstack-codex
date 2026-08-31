@@ -10,7 +10,7 @@ Investigate the motivation and intent behind code. Why was it built this way? Wh
 
 Companion to the `how` skill. `how` answers what the code does and how it works. `why` answers what forces led to its shape.
 
-**Platform note.** On Codex or another non-Claude runtime, the Claude tool names and `claude-*` slugs named below are Claude defaults. Resolve them via [`codex-tools.md`](../poteto-mode/references/codex-tools.md).
+**Platform note.** Claude tool names below stay as written on every runtime; resolve them via [`codex-tools.md`](../poteto-mode/references/codex-tools.md). Model slugs are the Codex+Grok catalog; on Claude Code substitute the sidecar catalog via `/setup-pstack`.
 
 ## How this skill works
 
@@ -233,7 +233,7 @@ After the Sources Consulted block, if the user's `why` question is a precursor t
 
 ## Models
 
-Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
+Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` (Claude Code) or `~/.codex/pstack-models.md` (Codex) overrides each at runtime; see `/setup-pstack`.
 
-- why investigators: `claude-opus-5`
-- why synthesizer: `claude-opus-5`
+- why investigators: `gpt-5.6-luna`
+- why synthesizer: `gpt-5.6-sol`

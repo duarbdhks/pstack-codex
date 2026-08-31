@@ -8,7 +8,7 @@ menu-description: run N parallel attempts at the same task and pick the best par
 
 Fan out N parallel attempts at the same task. Read every candidate end to end. Pick the strongest as the base. Graft the best ideas from the others into it. Verify the synthesized result.
 
-**Platform note.** On Codex or another non-Claude runtime, the Claude tool names, `claude-*` slugs, and Claude built-in skills named below are Claude defaults. Resolve them via [`codex-tools.md`](../poteto-mode/references/codex-tools.md).
+**Platform note.** Claude tool names and built-in skills below stay as written on every runtime; resolve them via [`codex-tools.md`](../poteto-mode/references/codex-tools.md). Model slugs are the Codex+Grok catalog; on Claude Code substitute the sidecar catalog via `/setup-pstack`.
 
 ## Start
 
@@ -74,7 +74,7 @@ One synthesized artifact. One short synthesis note alongside, naming the base, t
 
 ## Models
 
-Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
+Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` (Claude Code) or `~/.codex/pstack-models.md` (Codex) overrides each at runtime; see `/setup-pstack`.
 
-- arena runners: `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`
-- arena cross-judge pool: `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`
+- arena runners: `gpt-5.6-sol`, `gpt-5.6-luna`, `grok-4.6`
+- arena cross-judge pool: `gpt-5.6-sol`, `gpt-5.6-luna`, `grok-4.6`

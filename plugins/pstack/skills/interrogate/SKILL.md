@@ -10,7 +10,7 @@ Spawn one reviewer per configured model to adversarially review code changes. Ea
 
 The deliverable is a synthesized verdict. Do NOT auto-apply changes.
 
-**Platform note.** On Codex or another non-Claude runtime, the `subagent_type`/`model`/`readonly` dispatch fields and the `claude-*` model slugs below are Claude defaults. Resolve them via [`codex-tools.md`](../poteto-mode/references/codex-tools.md) (dispatch maps to `spawn_agent`; substitute your configured Codex models, keeping the panel model-diverse).
+**Platform note.** Dispatch fields (`subagent_type`/`model`/`readonly`) stay in Claude tool language; on Codex resolve them via [`codex-tools.md`](../poteto-mode/references/codex-tools.md) (`spawn_agent`). Model slugs are the Codex+Grok catalog; keep the panel model-diverse. On Claude Code substitute the sidecar catalog via `/setup-pstack`.
 
 ## Step 1, Determine Scope
 
@@ -39,9 +39,9 @@ Launch all reviewers in a single message using the `Agent` tool. Use the `interr
 
 | Subagent | Default model |
 |----------|---------------|
-| Reviewer A | `claude-opus-5` |
-| Reviewer B | `claude-fable-5` |
-| Reviewer C | `claude-sonnet-5` |
+| Reviewer A | `gpt-5.6-sol` |
+| Reviewer B | `gpt-5.6-luna` |
+| Reviewer C | `grok-4.6` |
 
 For each reviewer:
 - `subagent_type`: `general-purpose`

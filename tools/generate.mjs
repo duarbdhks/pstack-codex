@@ -11,11 +11,12 @@
 //     -> its Codex prompt stub in plugins/pstack/.codex-plugin/prompts/
 //     -> its row in README.md's "Slash commands" table
 //   plugins/pstack/models.json (the model policy: role defaults, diverse panel,
-//   available slugs, Codex equivalents)
+//   available slugs, Claude sidecar)
 //     -> each model-consuming skill's "## Models" section
 //     -> setup-pstack's override-sheet block and interrogate's reviewer table
 //     -> the "## Model names" section of poteto-mode/references/codex-tools.md
-//   No other claude-* slug may appear in skill prose; the scan below fails on strays.
+//   No model slug may appear in skill prose outside stamped regions; the scan
+//   below fails on strays.
 //
 // Also validated: .agents/plugins/marketplace.json points at a real plugin
 // directory whose Codex manifest name matches (it carries no version; Codex
@@ -127,18 +128,24 @@ export function modelsSection(roles) {
   const bullets = roles.map((r) => `- ${r.role}: ${codeList(r.models)}`).join("\n");
   return (
     "Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). " +
-    "A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`.\n\n" +
+    "A matching role line in `~/.claude/pstack-models.md` (Claude Code) or `~/.codex/pstack-models.md` (Codex) " +
+    "overrides each at runtime; see `/setup-pstack`.\n\n" +
     bullets
   );
 }
 
 export function setupModelsSection(models) {
   const avail = models.available.map((m) => `${m.label} (${code(m.slug)})`).join(", ");
+  const claude = models.claude;
+  const claudeLine = claude
+    ? `\n- Claude Code sidecar: default ${code(claude.singleRoleDefault)}, panel ${codeList(claude.panel)}; available ${claude.available.map((m) => `${m.label} (${code(m.slug)})`).join(", ")}`
+    : "";
   return (
     "Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`).\n\n" +
-    `- Available Claude models: ${avail}\n` +
+    `- Available models: ${avail}\n` +
     `- Default panel: ${codeList(models.panel)}\n` +
-    `- Single-role default: ${code(models.singleRoleDefault)}`
+    `- Single-role default: ${code(models.singleRoleDefault)}` +
+    claudeLine
   );
 }
 
@@ -181,23 +188,30 @@ export function stampReviewerTable(text, models, file) {
 }
 
 export function codexModelNamesSection(models) {
+  const claude = models.claude;
+  const claudeHint = claude
+    ? ` On Claude Code substitute the sidecar catalog (single-role ${code(claude.singleRoleDefault)}, panel ${codeList(claude.panel)}) via \`/setup-pstack\`.`
+    : "";
+  const [sol, luna, grok] = models.panel;
   return (
-    "Skills name Claude defaults (a single-role default for code/prose/judgment plus a diverse-model panel for " +
-    "diverse-model panels; each model-consuming skill lists its own in a Models section). These slugs do not " +
-    "resolve on Codex. Substitute your configured Codex models:\n\n" +
-    `- Single-model roles: your primary Codex model (for example ${code(models.codex.singleRoleExample)}).\n` +
-    "- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`): the adversarial " +
-    "signal comes from model diversity, so use the distinct Codex models available to you. A good default quad " +
-    `on ChatGPT is ${codeList(models.codex.panelQuad)}. If only one model family is reachable, vary reasoning ` +
-    "effort and note in the verdict that diversity was reduced.\n\n" +
-    "`/setup-pstack` writes the configured model list. On Codex, set it to your Codex model slugs."
+    "Skills name Codex+Grok defaults (a single-role default for code/prose/judgment plus a diverse-model panel; " +
+    "each model-consuming skill lists its own in a Models section). These slugs do not resolve on Claude Code." +
+    claudeHint +
+    " On Codex they work as written. On Grok, map through the runtime adapter below.\n\n" +
+    `- Single-model roles: judgment, implementation, and synthesis use ${code(models.singleRoleDefault)}; exploration and volume work use the explorer/worker roles stamped per skill.\n` +
+    `- Diverse-model panels (\`arena\`, \`architect\`, \`interrogate\`, \`how\` critics): ${codeList(models.panel)}. If a runtime cannot reach a family, vary remaining models and note that diversity was reduced.\n\n` +
+    "Runtime adapter (canonical slug to spawn id):\n\n" +
+    `- Codex: ${code(sol)} stays ${code(sol)}; ${code(luna)} stays ${code(luna)}; ${code(grok)} becomes ${code("xai/grok-4.6")} when the OpenCodex Grok override is active, otherwise skip that panel seat or pick another available family.\n` +
+    `- Grok: ${code(sol)} becomes ${code("ocx-gpt-5-6-sol")}; ${code(luna)} becomes ${code("ocx-gpt-5-6-luna")}; ${code(grok)} stays ${code(grok)}.\n\n` +
+    "`/setup-pstack` writes the configured model list."
   );
 }
 
-// After stamping, no claude-* model slug may survive in skill prose outside
-// the generator-owned regions. The scan blanks each owned line range (keeping
+// After stamping, no model slug may survive in skill prose outside the
+// generator-owned regions. The scan blanks each owned line range (keeping
 // line numbers stable) and reports whatever still matches.
-const SLUG_RE = /claude-(?:opus|fable|sonnet|haiku)[0-9a-z.-]*/;
+const SLUG_RE =
+  /\b(?:claude-(?:opus|fable|sonnet|haiku)[0-9a-z.-]*|gpt-5(?:\.\d+)?(?:-[a-z0-9]+)*|grok-4(?:\.\d+)?(?:-[a-z0-9]+)*|ocx-(?:gpt|xai|anthropic)[0-9a-z.-]*|xai\/grok-4(?:\.\d+)?)\b/;
 
 // [start, end) line ranges of every generator-owned region in this file.
 export function ownedRanges(lines) {
@@ -372,7 +386,7 @@ function main() {
   walk(skillsDir);
   if (strays.length) {
     throw new Error(
-      `claude-* model slugs outside generator-owned regions (move the fact into models.json or reference the role):\n` +
+      `model slugs outside generator-owned regions (move the fact into models.json or reference the role):\n` +
         strays.join("\n"),
     );
   }

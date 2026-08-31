@@ -8,7 +8,7 @@ menu-description: settle types and module shape before writing code that crosses
 
 Design before implementing. Sketch types, function signatures, class shapes, and module boundaries with `not implemented` bodies and pseudocode. Synthesize across multiple model perspectives, then fill in code against the chosen sketch. If implementation proves the sketch wrong, throw it out and redesign.
 
-**Platform note.** On Codex or another non-Claude runtime, the Claude tool names, `claude-*` slugs, and Claude built-in skills named below are Claude defaults. Resolve them via [`codex-tools.md`](../poteto-mode/references/codex-tools.md).
+**Platform note.** Claude tool names and built-in skills below stay as written on every runtime; resolve them via [`codex-tools.md`](../poteto-mode/references/codex-tools.md). Model slugs are the Codex+Grok catalog; on Claude Code substitute the sidecar catalog via `/setup-pstack`.
 
 ## Start
 
@@ -86,6 +86,6 @@ The caller's usage is written first and the type sketch derived from it. One fil
 
 ## Models
 
-Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
+Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` (Claude Code) or `~/.codex/pstack-models.md` (Codex) overrides each at runtime; see `/setup-pstack`.
 
-- architect runners: `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`
+- architect runners: `gpt-5.6-sol`, `gpt-5.6-luna`, `grok-4.6`

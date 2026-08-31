@@ -8,7 +8,7 @@ menu-description: default entry point for any non-trivial task
 
 ## Platform Adaptation
 
-These skills use Claude Code tool names (the `Skill` tool, the `Agent` tool, `AskUserQuestion`) and Claude model slugs (`claude-*`). On Claude Code they work as written. On Codex and other runtimes, the skills are the same files; only the tool, model, and built-in-skill names resolve differently. When a skill names a Claude tool, a `claude-*` model, or a Claude built-in skill (`run`, `verify`, `plugin-dev:skill-development`), read [`references/codex-tools.md`](references/codex-tools.md) for the Codex equivalent.
+These skills use Claude Code tool names (the `Skill` tool, the `Agent` tool, `AskUserQuestion`) and model slugs from the Codex+Grok catalog. Tool names work as written on Claude Code; on Codex and other runtimes resolve them via [`references/codex-tools.md`](references/codex-tools.md). Model slugs work as written on Codex and Grok (Grok through the runtime adapter in that file). On Claude Code, substitute the sidecar catalog via `/setup-pstack`. When a skill names a Claude built-in skill (`run`, `verify`, `plugin-dev:skill-development`), read the same map.
 
 ## Non-negotiables
 
@@ -141,11 +141,11 @@ A large or cross-cutting effort (a migration across many call sites, an ambitiou
 
 ## Models
 
-Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
+Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` (Claude Code) or `~/.codex/pstack-models.md` (Codex) overrides each at runtime; see `/setup-pstack`.
 
-- feature, refactoring: `claude-opus-5`
-- bug-fix: `claude-fable-5`
-- perf-issue: `claude-fable-5`
-- hillclimb: `claude-fable-5`
-- judgment and prose: `claude-opus-5`
-- strongest judgment: `claude-fable-5`
+- feature, refactoring: `gpt-5.6-sol`
+- bug-fix: `gpt-5.6-sol`
+- perf-issue: `gpt-5.6-sol`
+- hillclimb: `gpt-5.6-sol`
+- judgment and prose: `gpt-5.6-sol`
+- strongest judgment: `gpt-5.6-sol`

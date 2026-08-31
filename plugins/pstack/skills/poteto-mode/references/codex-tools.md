@@ -1,6 +1,6 @@
 # Codex tool mapping for pstack
 
-pstack skills are written in Claude Code tool language (the `Skill` tool, the `Agent` tool, `AskUserQuestion`, `claude-*` model slugs). On Codex the skills are the same files; only the tool names resolve differently. Read this when a pstack skill names a Claude tool, a Claude built-in skill, or a `claude-*` model.
+pstack skills are written in Claude Code tool language (the `Skill` tool, the `Agent` tool, `AskUserQuestion`). Model slugs are the Codex+Grok catalog stamped from `models.json`. On Codex the skills are the same files; tool names resolve through this map, and model slugs work as written. On Claude Code, substitute the sidecar catalog via `/setup-pstack`. Read this when a pstack skill names a Claude tool, a Claude built-in skill, or a model slug.
 
 ## Tool actions
 
@@ -31,15 +31,36 @@ Without it, `spawn_agent` is unavailable and the fan-out skills (`interrogate`, 
 
 ## Subagent policy
 
-poteto-mode's Subagents section sets Claude-specific defaults (`subagent_type: "poteto-agent"`, `run_in_background: true`). On Codex:
+poteto-mode's Subagents section sets Claude-specific defaults (`subagent_type: "poteto-agent"`, `run_in_background: true`). Those strings are Claude names. Do not register `poteto-agent` as a new Codex or Grok type. Translate at spawn time.
 
-- Use the `default` Codex agent type for every pstack role. Do not translate semantic roles into Codex types such as `reviewer` or `explorer`. A specialized type can own its model and reasoning effort. Put the pstack role in `task_name` and the prompt instead.
+### Type translation
+
+| Skill name | Codex | Grok |
+|------------|-------|------|
+| `poteto-agent` | `spawn_agent` with `agent_type="default"`; `task_name="poteto-agent"`; prompt reads the `poteto-mode` skill's `SKILL.md` in full first, including Principles | `spawn_subagent` with `subagent_type="pstack:poteto-agent"`; prompt still reads that skill in full first |
+| `general-purpose` | `agent_type="default"` | `subagent_type="general-purpose"` |
+| `comment-sicko` | `agent_type="default"`; prompt reads `agents/comment-sicko.md` in full first | `subagent_type="pstack:Comment Sicko"` |
+
+`explore` / `explorer` are not pstack role carriers. Investigation roles stay on this map: Codex `default` plus the Luna row in `pstack-models.md`. Grok's built-in `explore` is read-only lookup, not a poteto implementation delegate.
+
+If a runtime rejects the translated type, stop. Do not silently substitute Codex `worker` or Grok `general-purpose`. Those skips drop the skill read and let the type own model or effort.
+
+On Codex:
+
+- Use the `default` Codex agent type for every pstack role. Do not translate semantic roles into Codex types such as `worker`, `reviewer`, or `explorer`. A specialized type can own its model and reasoning effort. Put the pstack role in `task_name` and the prompt instead.
 - Resolve `model` from `~/.codex/pstack-models.md`. Resolve `reasoning_effort` from the active `AGENTS.md` policy. Pass both fields explicitly. Do not dispatch until both values resolve.
 - Set `fork_turns` to `"none"` by default. Use a positive bounded count only when the task needs recent history.
-- There is no `poteto-agent` subagent type. Route an ad-hoc subagent through poteto-mode's style by telling the `default` agent to read the `poteto-mode` skill in full first.
 - `spawn_agent` calls already run concurrently with your turn, so `run_in_background: true` has no separate flag. Issue the dispatch and continue.
-- There is no `comment-sicko` subagent type either. The **no-comments** skill spawns it on Claude Code; on Codex tell the `default` agent to read `agents/comment-sicko.md` in full first.
-- Claude Code runs every subagent on this machine, so the **swarm** skill's workers and the fan-out playbooks (`orchestrate`, `autopilot-full`, `autopilot-stack`) isolate writers with worktrees. The same holds on Codex.
+
+On Grok:
+
+- Plugin agents are `plugin-name:agent-name`. The pstack agent is `pstack:poteto-agent`, not `poteto-agent`.
+- Resume an existing poteto child with `resume_from` rather than spawning a sibling.
+- Omit `model` unless the user named one. Grok spawn has no `reasoning_effort` field.
+
+Shared:
+
+- Claude Code runs every subagent on this machine, so the **swarm** skill's workers and the fan-out playbooks (`orchestrate`, `autopilot-full`, `autopilot-stack`) isolate writers with worktrees. The same holds on Codex and Grok.
 - Keep the rest of the policy unchanged. Pass file pointers not inlined context, give each worker its own worktree or branch when they write, review every subagent's diff yourself.
 
 ## Codex spawn contract
@@ -57,12 +78,17 @@ poteto-mode's Subagents section sets Claude-specific defaults (`subagent_type: "
 
 ## Model names
 
-Skills name Claude defaults (a single-role default for code/prose/judgment plus a diverse-model panel for diverse-model panels; each model-consuming skill lists its own in a Models section). These slugs do not resolve on Codex. Substitute your configured Codex models:
+Skills name Codex+Grok defaults (a single-role default for code/prose/judgment plus a diverse-model panel; each model-consuming skill lists its own in a Models section). These slugs do not resolve on Claude Code. On Claude Code substitute the sidecar catalog (single-role `claude-opus-5`, panel `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`) via `/setup-pstack`. On Codex they work as written. On Grok, map through the runtime adapter below.
 
-- Single-model roles: your primary Codex model (for example `gpt-5.6-sol`).
-- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`): the adversarial signal comes from model diversity, so use the distinct Codex models available to you. A good default quad on ChatGPT is `gpt-5.6-sol`, `gpt-5.5`, `gpt-5.4`, `gpt-5.6-luna`. If only one model family is reachable, vary reasoning effort and note in the verdict that diversity was reduced.
+- Single-model roles: judgment, implementation, and synthesis use `gpt-5.6-sol`; exploration and volume work use the explorer/worker roles stamped per skill.
+- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics): `gpt-5.6-sol`, `gpt-5.6-luna`, `grok-4.6`. If a runtime cannot reach a family, vary remaining models and note that diversity was reduced.
 
-`/setup-pstack` writes the configured model list. On Codex, set it to your Codex model slugs.
+Runtime adapter (canonical slug to spawn id):
+
+- Codex: `gpt-5.6-sol` stays `gpt-5.6-sol`; `gpt-5.6-luna` stays `gpt-5.6-luna`; `grok-4.6` becomes `xai/grok-4.6` when the OpenCodex Grok override is active, otherwise skip that panel seat or pick another available family.
+- Grok: `gpt-5.6-sol` becomes `ocx-gpt-5-6-sol`; `gpt-5.6-luna` becomes `ocx-gpt-5-6-luna`; `grok-4.6` stays `grok-4.6`.
+
+`/setup-pstack` writes the configured model list.
 
 ## Claude built-in skills pstack references
 

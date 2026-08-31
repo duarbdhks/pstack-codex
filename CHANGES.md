@@ -2,6 +2,10 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.17 — stamp Codex+Grok defaults, keep Claude as a sidecar
+
+`plugins/pstack/models.json` no longer stamps Claude family slugs as the plugin defaults. Single-model roles follow the Codex split: judgment, implementation, and synthesis use `gpt-5.6-sol`; exploration and volume work use `gpt-5.6-luna`. The four panels (`how critics`, `arena runners`, `architect runners`, `interrogate reviewers`) run the three-model panel `gpt-5.6-sol`, `gpt-5.6-luna`, `grok-4.6`. The previous Claude catalog moves to a `claude` sidecar so `/setup-pstack` can still restore Claude Code slugs. The generator restamps Models sections, the interrogate reviewer table, setup-pstack's override sheet, and `codex-tools.md` Model names (including the Codex/Grok runtime adapter). Stray-slug scanning now covers `gpt-5*`, `grok-4*`, and `ocx-*` as well as `claude-*`.
+
 ## 0.9.16 — keep Codex pstack effort policy on the default agent
 
 Codex pstack dispatches now use the `default` agent type with explicit `model` and `reasoning_effort` values. Semantic roles stay in `task_name` and the prompt, so fixed Codex profiles such as `reviewer` cannot replace the user's role policy. `codex-tools.md` owns the request shape, and the invariant fixtures reject semantic agent types and missing policy fields. Generic dispatch remains the supported route; this release does not restore the fixed-profile routing closed in PR #20.
