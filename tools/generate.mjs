@@ -17,6 +17,9 @@
 //     -> each model-consuming skill's "## Models" section
 //     -> setup-pstack's override-sheet block and interrogate's reviewer table
 //     -> the "## Model names" section of poteto-mode/references/codex-tools.md
+//   plugins/pstack/agents/{poteto-agent,comment-sicko}.md, LICENSE,
+//   LICENSE-cursor-team-kit, and NOTICE-skills.md
+//     -> portable copies under poteto-mode/references/{agents,licenses}/
 //   No other claude-* slug may appear in skill prose; the scan below fails on strays.
 //
 // Also validated: .agents/plugins/marketplace.json points at a real plugin
@@ -25,14 +28,20 @@
 
 import {
   existsSync,
+  lstatSync,
+  mkdirSync,
   readFileSync,
   readdirSync,
+  realpathSync,
+  rmSync,
   statSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+
+import { pathIsInside, validateProsePaths, validateSkillsTree } from "./validate-skills.mjs";
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -41,6 +50,88 @@ const VERSIONED_MANIFESTS = [
   "plugins/pstack/.claude-plugin/plugin.json",
   "plugins/pstack/.codex-plugin/plugin.json",
 ];
+
+export const PORTABLE_ASSETS = [
+  {
+    source: "plugins/pstack/agents/poteto-agent.md",
+    target: "poteto-mode/references/agents/poteto-agent.md",
+  },
+  {
+    source: "plugins/pstack/agents/comment-sicko.md",
+    target: "poteto-mode/references/agents/comment-sicko.md",
+  },
+  { source: "LICENSE", target: "poteto-mode/references/licenses/LICENSE" },
+  {
+    source: "LICENSE-cursor-team-kit",
+    target: "poteto-mode/references/licenses/LICENSE-cursor-team-kit",
+  },
+  { source: "NOTICE-skills.md", target: "poteto-mode/references/licenses/NOTICE.md" },
+];
+
+const PORTABLE_OUTPUT_DIRS = [
+  "poteto-mode/references/agents",
+  "poteto-mode/references/licenses",
+];
+
+function resolveWithin(root, path) {
+  const base = resolve(root);
+  const resolved = resolve(base, path);
+  if (!pathIsInside(base, resolved)) {
+    throw new Error(`${path} resolves outside ${base}`);
+  }
+  return resolved;
+}
+
+export function syncPortableAssets(repoRoot, skillsRoot, { log = console.log } = {}) {
+  mkdirSync(skillsRoot, { recursive: true });
+  const realRepoRoot = realpathSync(repoRoot);
+  const realSkillsRoot = realpathSync(skillsRoot);
+  const expectedByDir = new Map(
+    PORTABLE_OUTPUT_DIRS.map((dir) => [resolveWithin(skillsRoot, dir), new Set()]),
+  );
+  for (const dir of expectedByDir.keys()) {
+    mkdirSync(dir, { recursive: true });
+    if (!pathIsInside(realSkillsRoot, realpathSync(dir))) {
+      throw new Error(`${relative(skillsRoot, dir)} resolves outside the skills tree through a symlink`);
+    }
+  }
+
+  const prepared = PORTABLE_ASSETS.map((asset) => {
+    const source = resolveWithin(repoRoot, asset.source);
+    const target = resolveWithin(skillsRoot, asset.target);
+    const targetDir = dirname(target);
+    if (!pathIsInside(realRepoRoot, realpathSync(source))) {
+      throw new Error(`${asset.source} resolves outside the repository through a symlink`);
+    }
+    const expected = expectedByDir.get(targetDir);
+    if (!expected) throw new Error(`${asset.target} has no declared generated output directory`);
+    expected.add(basename(target));
+    if (existsSync(target) && lstatSync(target).isSymbolicLink()) {
+      throw new Error(`${asset.target} is a symlink; refusing to overwrite it`);
+    }
+    return { label: asset.target, target, next: readFileSync(source, "utf8") };
+  });
+
+  let stamped = 0;
+  let removed = 0;
+  for (const { label, target, next } of prepared) {
+    if (existsSync(target) && readFileSync(target, "utf8") === next) continue;
+    writeFileSync(target, next);
+    stamped += 1;
+    log(`stamped: ${label}`);
+  }
+
+  for (const [dir, expected] of expectedByDir) {
+    for (const entry of readdirSync(dir)) {
+      if (expected.has(entry)) continue;
+      rmSync(join(dir, entry), { recursive: true, force: true });
+      removed += 1;
+      log(`removed orphan: ${relative(skillsRoot, join(dir, entry))}`);
+    }
+  }
+
+  return { stamped, removed, total: PORTABLE_ASSETS.length };
+}
 
 // Replace the manifest's single "version" value, preserving all formatting.
 // Exactly one "version" field per manifest is a precondition: a second one
@@ -360,7 +451,7 @@ function main() {
     bySkill.get(r.skill).push(r);
   }
   const stampFile = (path, next, label) => {
-    if (readFileSync(path, "utf8") === next) return false;
+    if (existsSync(path) && readFileSync(path, "utf8") === next) return false;
     writeFileSync(path, next);
     console.log(`stamped: ${label}`);
     return true;
@@ -440,6 +531,15 @@ function main() {
     writeFileSync(readmePath, nextReadme);
     console.log("stamped: README.md slash-command table");
   }
+
+  const portable = syncPortableAssets(repo, skillsDir);
+  if (portable.stamped === 0 && portable.removed === 0) {
+    console.log(`ok: ${portable.total} portable assets current`);
+  }
+  validateSkillsTree(skillsDir);
+  console.log("ok: local markdown links stay inside the skills tree");
+  validateProsePaths(skillsDir);
+  console.log("ok: no skill prose points at a path outside the skills tree");
 
   const codexName = JSON.parse(
     readFileSync(join(repo, "plugins/pstack/.codex-plugin/plugin.json"), "utf8"),

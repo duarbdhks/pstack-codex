@@ -49,6 +49,24 @@ jobs:
       - name: Sync-tool fixture tests
         run: bun test tests/
 
+  skills-only:
+    name: Skills-only install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Installs this checkout rather than the GitHub URL, so the canary proves
+      # the tree in the PR instead of whatever is on main.
+      - name: Install the skills tree with the skills CLI
+        run: |
+          npx --yes skills@1.5.23 add "$PWD/plugins/pstack/skills" \
+            --skill '*' --agent '*' --yes --copy
+      - name: Compare and validate the installed skills tree
+        run: |
+          diff -qr plugins/pstack/skills .agents/skills
+          node tools/validate-skills.mjs .agents/skills
+
   scripts:
     name: Vendored bun tooling
     runs-on: ubuntu-latest
