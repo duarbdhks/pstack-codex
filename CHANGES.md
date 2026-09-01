@@ -2,6 +2,16 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.16 — native Agent Skills paths for opencode and Gemini CLI
+
+opencode and Gemini CLI both discover the shared `plugins/pstack/skills/` tree natively. They support the same `~/.agents/skills/` user directory already used by the Codex and Prime installs, so one symlink loop now installs all four Agent Skills runtimes. Neither new runtime gets generated command files. The generator keeps its single Codex-only prompt adapter.
+
+The shared install links all 52 directories. Thirty-one are public workflows and 21 `principle-*` leaves are internal references used by `poteto-mode`. opencode ignores the pstack-specific `user-invocable: false` key and lists the leaves; the README records that tradeoff. The opencode path is verified on a live 1.18.25 session. The Gemini CLI path follows its published Agent Skills discovery contract and has not been run live.
+
+The generator now validates the portable `name` and `description` frontmatter on every shared skill before deriving public Codex prompts and the README command table. `tests/agent-skills.test.mjs` exercises that boundary instead of testing a runtime-specific serializer. Importing `tools/generate.mjs` no longer regenerates the repository as a side effect.
+
+`codex-tools.md` remains a Codex-only adapter. Platform notes no longer send arbitrary non-Claude runtimes through Codex tool names, model slugs, or configuration paths. Gemini CLI, opencode, and Prime Agent get native discovery, but their Claude-specific execution equivalents and delegation-heavy workflows remain runtime-owned and unverified. Model policy is unchanged.
+
 ## 0.9.15 — retire Opus 4.8 from the model defaults
 
 `plugins/pstack/models.json` no longer names `claude-opus-4-8` as a default. Every single-model role that used it (`feature, refactoring`, `judgment and prose`, `how explorer`, `how explainer`, `why investigators`, `why synthesizer`, `reflect tooling`, `reflect judgment, divergent, synthesizer`, `swarm workers`, and the single-role default) now runs `claude-opus-5`. The three roles that carry the hardest code changes (`bug-fix`, `perf-issue`, `hillclimb`) move to `claude-fable-5`, matching the existing `strongest judgment` row. `claude-haiku-4-5` leaves the four panels (`how critics`, `arena runners`, `architect runners`, `interrogate reviewers`), so each runs the three-model panel `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`; the `models.json` key is now `panel`, not `panelQuad`. The generator restamped the `## Models` sections, the interrogate reviewer table, and the interrogate menu row; the README substitution table rows for the Cursor `claude-opus-4-X-thinking-xhigh` variant and the panel quad now state the current defaults. Opus 4.8 stays in the available-model list for `/setup-pstack` overrides.

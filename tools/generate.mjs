@@ -7,7 +7,9 @@
 // Sources of truth:
 //   VERSION  -> the "version" field in the three plugin manifests
 //   CHANGES.md must carry a heading for the current VERSION (release completeness)
-//   each public skill's frontmatter (name + menu-description)
+//   each skill's frontmatter (name + description) defines the shared Agent
+//   Skills boundary consumed natively by Codex, Prime, opencode, and Gemini CLI
+//   each public skill's menu-description
 //     -> its Codex prompt stub in plugins/pstack/.codex-plugin/prompts/
 //     -> its row in README.md's "Slash commands" table
 //   plugins/pstack/models.json (the model policy: role defaults, diverse panel,
@@ -21,9 +23,16 @@
 // directory whose Codex manifest name matches (it carries no version; Codex
 // reads the version from .codex-plugin/plugin.json).
 
-import { existsSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -83,24 +92,48 @@ export function frontmatterValue(text, key) {
   return line?.slice(key.length + 2);
 }
 
-// A public skill is any skills/<name>/SKILL.md not marked user-invocable: false
-// (the principle-* leaves). Each must carry menu-description, the one-liner the
-// Codex slash menu and the README command table both render.
-export function publicSkills(skillsDir) {
+// Validate the shared subset of the Agent Skills contract before deriving any
+// runtime-specific views. Runtime-only frontmatter keys may be ignored by other
+// consumers, but every skill needs a portable name and description.
+export function agentSkills(skillsDir) {
   const skills = [];
   for (const entry of readdirSync(skillsDir).sort()) {
     const path = join(skillsDir, entry, "SKILL.md");
     if (!statSync(join(skillsDir, entry)).isDirectory() || !existsSync(path)) continue;
     const text = readFileSync(path, "utf8");
     const front = text.match(/^---\n([\s\S]*?)\n---/)?.[1] ?? "";
-    if (front.split("\n").includes("user-invocable: false")) continue;
     const name = frontmatterValue(text, "name");
     if (name !== entry) throw new Error(`${path}: frontmatter name "${name}" != directory "${entry}"`);
-    const menu = frontmatterValue(text, "menu-description");
-    if (!menu) throw new Error(`${path}: public skill has no menu-description frontmatter`);
-    skills.push({ name, menu });
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) || name.length > 64) {
+      throw new Error(`${path}: frontmatter name "${name}" is not a portable Agent Skills name`);
+    }
+    const description = frontmatterValue(text, "description");
+    if (!description) throw new Error(`${path}: skill has no description frontmatter`);
+    if (description.length > 1024) {
+      throw new Error(`${path}: description exceeds the portable Agent Skills limit of 1024 characters`);
+    }
+    skills.push({
+      name,
+      description,
+      menu: frontmatterValue(text, "menu-description"),
+      userInvocable: !front.split("\n").includes("user-invocable: false"),
+    });
   }
   return skills;
+}
+
+// A public skill is any Agent Skill not marked user-invocable: false (the
+// principle-* leaves). Each needs the one-liner rendered into the Codex slash
+// menu and README command table.
+export function publicSkills(skillsDir) {
+  return agentSkills(skillsDir)
+    .filter((skill) => skill.userInvocable)
+    .map(({ name, menu }) => {
+      if (!menu) {
+        throw new Error(`${join(skillsDir, name, "SKILL.md")}: public skill has no menu-description`);
+      }
+      return { name, menu };
+    });
 }
 
 export function promptStub({ name, menu }) {
@@ -424,9 +457,13 @@ function main() {
   console.log("ok: hooks.json commands point at existing, executable scripts");
 }
 
-try {
-  main();
-} catch (err) {
-  console.error(`FAIL: ${err.message}`);
-  process.exit(1);
+// Guarded so importing the generator's validation and rendering functions does
+// not regenerate the repo as a side effect.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  try {
+    main();
+  } catch (err) {
+    console.error(`FAIL: ${err.message}`);
+    process.exit(1);
+  }
 }
