@@ -124,8 +124,15 @@ jobs:
               printf '%s\n\n' "Automated upstream sync."
               cat "$report"
             } > "$body"
+            set +e
             gh pr create --base "$DEFAULT_BRANCH" --head sync/upstream --title "chore(sync): upstream pstack/cursor-team-kit" --body-file "$body"
+            pr_code=$?
+            set -e
             rm -f "$body"
+            if [ "$pr_code" -ne 0 ]; then
+              echo "pr create failed; branch remains sync/upstream"
+              all_ok=0
+            fi
           fi
 
           verify_ok=1
