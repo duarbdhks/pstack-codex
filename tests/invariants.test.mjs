@@ -52,7 +52,7 @@ function fixture(mutate = () => {}) {
 function run(dir) {
   const r = spawnSync("bash", [script], {
     encoding: "utf8",
-    env: { ...process.env, PSTACK_REPO: dir, SKIP_BEHAVIORAL: "1" },
+    env: { ...process.env, PSTACK_REPO: dir },
   });
   return { code: r.status, out: r.stdout + r.stderr };
 }

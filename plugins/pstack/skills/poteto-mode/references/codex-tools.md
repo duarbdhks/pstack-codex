@@ -78,7 +78,7 @@ Shared:
 
 ## Model names
 
-Skills name Codex+Grok defaults (a single-role default for code/prose/judgment plus a diverse-model panel; each model-consuming skill lists its own in a Models section). These slugs do not resolve on Claude Code. On Claude Code substitute the sidecar catalog (single-role `claude-opus-5`, panel `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`) via `/setup-pstack`. On Codex they work as written. On Grok, map through the runtime adapter below.
+Skills name Codex+Grok defaults (a single-role default for code/prose/judgment plus a diverse-model panel; each model-consuming skill lists its own in a Models section). On Codex they work as written. On Grok, map through the runtime adapter below.
 
 - Single-model roles: judgment, implementation, and synthesis use `gpt-5.6-sol`; exploration and volume work use the explorer/worker roles stamped per skill.
 - Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics): `gpt-5.6-sol`, `gpt-5.6-luna`, `grok-4.6`. If a runtime cannot reach a family, vary remaining models and note that diversity was reduced.

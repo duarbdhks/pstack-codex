@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "@pstack-claude/poteto-mode-tools",
+      "name": "@pstack-codex/poteto-mode-tools",
       "dependencies": {
         "commander": "15.0.0",
       },

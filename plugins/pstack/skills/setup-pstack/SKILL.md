@@ -80,4 +80,3 @@ Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs
 - Available models: GPT-5.6 Sol (`gpt-5.6-sol`), GPT-5.6 Luna (`gpt-5.6-luna`), Grok 4.6 (`grok-4.6`), GPT-5.5 (`gpt-5.5`), GPT-5.4 (`gpt-5.4`)
 - Default panel: `gpt-5.6-sol`, `gpt-5.6-luna`, `grok-4.6`
 - Single-role default: `gpt-5.6-sol`
-- Claude Code sidecar: default `claude-opus-5`, panel `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`; available Opus 5 (`claude-opus-5`), Opus 4.8 (`claude-opus-4-8`), Opus 4.6 (`claude-opus-4-6`), Fable 5 (`claude-fable-5`), Sonnet 5 (`claude-sonnet-5`), Sonnet 4.6 (`claude-sonnet-4-6`), Haiku 4.5 (`claude-haiku-4-5`)

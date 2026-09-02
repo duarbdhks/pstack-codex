@@ -1,6 +1,6 @@
-# pstack for Claude Code, Codex, and Prime Agent
+# pstack for Codex and Prime Agent
 
-Claude Code port of [poteto](https://x.com/poteto)'s [pstack](https://github.com/cursor/plugins/tree/main/pstack) plugin (skill tree synced against upstream `4612556`, pstack v0.14.2 — see [What's deliberately not ported](#whats-deliberately-not-ported)). The same `skills/` tree also ships as a Codex plugin (see [Running on Codex](#running-on-codex)) and is discovered as-is by [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) (see [Prime Agent](#prime-agent)). Original by Lauren Tan; ships MIT. Imports seven skills from [cursor-team-kit](https://github.com/cursor/plugins/tree/main/cursor-team-kit) (also MIT): `deslop`, `thermo-nuclear-code-quality-review`, `make-pr-easy-to-review`, `fix-ci`, `fix-merge-conflicts`, `get-pr-comments`, `what-did-i-get-done`.
+Codex+Prime port of [poteto](https://x.com/poteto)'s [pstack](https://github.com/cursor/plugins/tree/main/pstack) plugin (skill tree synced against upstream `4612556`, pstack v0.14.2 — see [What's deliberately not ported](#whats-deliberately-not-ported)). Skill bodies still resolve Cursor primitives through the existing Claude-shaped translation; Codex maps via [`codex-tools.md`](plugins/pstack/skills/poteto-mode/references/codex-tools.md). The same `skills/` tree is discovered as-is by [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) (see [Prime Agent](#prime-agent)). Original by Lauren Tan; ships MIT. Imports seven skills from [cursor-team-kit](https://github.com/cursor/plugins/tree/main/cursor-team-kit) (also MIT): `deslop`, `thermo-nuclear-code-quality-review`, `make-pr-easy-to-review`, `fix-ci`, `fix-merge-conflicts`, `get-pr-comments`, `what-did-i-get-done`.
 
 > if you want to go fast, go deep first. pstack helps you write less, but higher quality code. rigorous agent workflows you can parallelize with confidence.
 
@@ -8,24 +8,13 @@ This is not a verbatim copy. Skill bodies have been edited so every Cursor-speci
 
 ## Install
 
-### Claude Code
-
-This repo ships as a Claude Code marketplace containing one plugin (`pstack`).
-
-```shell
-/plugin marketplace add michael-denyer/pstack-claude
-/plugin install pstack@pstack-claude
-```
-
-From 0.9.5 the plugin auto-fires, the same way superpowers does: a `SessionStart` hook (on `startup`, `/clear`, and post-`compact`) injects a ~0.3k-token mandate that routes any non-trivial engineering task into `poteto-mode` before the first response. The full skill still loads only on invoke. Dispatched subagents are told to ignore the mandate, and explicit user instructions take precedence. To opt out, delete `hooks/hooks.json` from the installed copy (`~/.claude/plugins/cache/pstack-claude/pstack/<version>/hooks/hooks.json`); a plugin update restores it.
-
 ### Codex
 
-The same plugin carries a `.codex-plugin/plugin.json` manifest and a root `.agents/plugins/marketplace.json`. The verified install is to link the plugin's skills into your cross-runtime skills directory:
+The plugin carries a `.codex-plugin/plugin.json` manifest and a root `.agents/plugins/marketplace.json`. The verified install is to link the plugin's skills into your cross-runtime skills directory:
 
 ```shell
-git clone https://github.com/michael-denyer/pstack-claude
-cd pstack-claude
+git clone https://github.com/duarbdhks/pstack-codex
+cd pstack-codex
 for s in plugins/pstack/skills/*/; do ln -s "$PWD/$s" ~/.agents/skills/"$(basename "$s")"; done
 ```
 
@@ -50,32 +39,28 @@ Each command invokes its skill, so `/tdd` runs the `tdd` skill. Installing the f
 [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) discovers skills from `~/.agents/skills/` and from `.agents/skills/` in the working tree up to the git root ([docs](https://github.com/PrimeIntellect-ai/prime-agent/blob/main/packages/coding-agent/docs/skills.md)). That is the same `~/.agents/skills/` directory the Codex install symlinks into, so the [Codex skill-link step](#codex) doubles as the Prime install — if you have already run it, Prime picks the skills up with no extra work:
 
 ```shell
-git clone https://github.com/michael-denyer/pstack-claude
-cd pstack-claude
+git clone https://github.com/duarbdhks/pstack-codex
+cd pstack-codex
 for s in plugins/pstack/skills/*/; do ln -s "$PWD/$s" ~/.agents/skills/"$(basename "$s")"; done
 ```
 
 pstack's `SKILL.md` frontmatter is a subset of what Prime reads: it requires `name` (lowercase, matching the parent directory — every pstack skill already conforms) and `description`, honours `disable-model-invocation`, and ignores unknown keys such as pstack's `user-invocable`. `curl -fsSL https://app.primeintellect.ai/prime-agent/install.sh | sh` installs Prime itself; `--no-skills` disables discovery, and explicit `--skill <path>` still loads. Prime is model-agnostic, so running these skills against **ChatGPT / OpenAI models is a Prime backend setting, not a plugin change** — keep the multi-model panels in `arena`, `interrogate`, `architect`, and `how` genuinely diverse across whatever models you configure (see the OpenAI panel note under [Running on Codex](#running-on-codex)).
 
-Unverified relative to Codex: the Codex path above is confirmed on a live session; the Prime path is derived from Prime's documented discovery paths and frontmatter schema, not yet run on a live Prime session. Prime has no plugin-hook runtime, so the Claude Code auto-fire hook does not apply — enter `pstack:poteto-mode` by name or add a standing routing instruction to your Prime config. Teardown is `rm ~/.agents/skills/<name>`.
+Unverified relative to Codex: the Codex path above is confirmed on a live session; the Prime path is derived from Prime's documented discovery paths and frontmatter schema, not yet run on a live Prime session. This port has no hook runtime — enter `pstack:poteto-mode` by name or add a standing routing instruction to your Prime config. Teardown is `rm ~/.agents/skills/<name>`.
 
 ## Layout
 
 ```text
 .
-├── .github/workflows/               # CI: invariants, bun tooling, shellcheck, OSV scan
-├── .claude-plugin/marketplace.json   # Claude Code marketplace manifest (repo root)
+├── .github/workflows/               # CI: invariants, bun tooling, shellcheck, OSV scan; sync-upstream.yml
 ├── .agents/plugins/marketplace.json  # Codex marketplace manifest (repo root)
 ├── plugins/pstack/                   # the plugin itself
-│   ├── .claude-plugin/plugin.json    # Claude Code manifest
 │   ├── .codex-plugin/plugin.json     # Codex manifest (skills: ./skills/)
-│   ├── skills/                       # 52 skills (shared by all three runtimes)
+│   ├── skills/                       # 52 skills (shared by Codex and Prime)
 │   │   ├── poteto-mode/references/codex-tools.md  # Claude→Codex tool/model/skill map
 │   │   └── poteto-mode/scripts/      # vendored bun/bash tooling: watch-pr, orch, worktree-audit.sh
-│   ├── .codex-plugin/prompts/        # 31 slash command stubs, generated (Codex only; link into ~/.codex/prompts)
-│   ├── hooks/                        # SessionStart auto-fire: injects the poteto-mode mandate (Claude Code only)
-│   └── agents/                       # Claude subagents: poteto-agent, comment-sicko (Codex routes via codex-tools.md)
-├── tests/skill-collision-repro.sh    # layout and flag invariants (needs claude CLI)
+│   └── .codex-plugin/prompts/        # 31 slash command stubs, generated (Codex only; link into ~/.codex/prompts)
+├── tests/skill-collision-repro.sh    # layout and flag invariants
 ├── tools/generate.mjs                # stamps VERSION, model defaults, Codex prompts, and the command table
 ├── tools/sync.mjs                    # syncs a component to a new upstream SHA, applying substitutions.json
 ├── tools/upstream.json               # upstream remote + per-component pinned SHAs
@@ -83,7 +68,6 @@ Unverified relative to Codex: the Codex path above is confirmed on a live sessio
 ├── VERSION                           # canonical plugin version (single source; manifests are stamped)
 ├── LICENSE                           # pstack upstream MIT
 ├── LICENSE-cursor-team-kit           # cursor-team-kit upstream MIT
-├── LICENSE-superpowers               # superpowers upstream MIT (hook runner)
 ├── CONTRIBUTING.md                   # sync boundary, local checks, release rules
 ├── NOTICE.md                         # attribution table
 ├── CHANGES.md                        # per-skill substitution audit
@@ -94,14 +78,14 @@ Plugin-internal path references in the docs below (`skills/<name>/`, `.codex-plu
 
 ## Running on Codex
 
-The Codex build shares one `skills/` tree with the Claude Code build. Nothing is forked; the only generated files are the prompt stubs, which `tools/generate.mjs` stamps from each skill's `menu-description` frontmatter. One mapping file does the translation. That single-mapping-file spine is the one `superpowers` ships for Codex. pstack diverges in one respect. superpowers writes its skills in tool-neutral language, so no skill names a runtime tool. pstack keeps the upstream Claude-native prose and adds a one-line Platform note to each skill that names a Claude primitive, so the port stays in lockstep with upstream sync.
+This port ships one `skills/` tree for Codex and Prime. Nothing is forked; the only generated files are the prompt stubs, which `tools/generate.mjs` stamps from each skill's `menu-description` frontmatter. One mapping file does the translation. That single-mapping-file spine is the one `superpowers` ships for Codex. pstack diverges in one respect. superpowers writes its skills in tool-neutral language, so no skill names a runtime tool. pstack keeps the upstream Claude-native prose and adds a one-line Platform note to each skill that names a Claude primitive, so the port stays in lockstep with upstream sync.
 
 - **Skill invocation.** Codex loads `SKILL.md` natively. There is no `Skill` tool. You invoke a skill by name (ask for it, or pick `pstack:poteto-mode` from the list).
 - **Commands.** The 31 `.codex-plugin/prompts/*.md` files are Codex-only, generated by `tools/generate.mjs` from each public skill's `menu-description` frontmatter (edit the skill, rerun the generator; hand edits to a stub are overwritten). Codex reads their `description` frontmatter and the filename, ignores the keys it doesn't know, and each body invokes its skill. Link them into `~/.codex/prompts/` for `/name` shortcuts (see [Install on Codex](#codex)). Claude Code ships no `commands/` directory: it renders both commands and user-invocable skills in the slash menu, so a trampoline paired with its skill duplicated every `/pstack:<name>` row (see CHANGES 0.9.13). The skill alone serves the slash command there.
-- **Tool, model, and built-in mapping.** When a skill names a Claude tool (the `Agent` tool, `AskUserQuestion`) or a Claude built-in skill (`run`, `verify`, `loop`, `plugin-dev:skill-development`), it resolves through [`skills/poteto-mode/references/codex-tools.md`](plugins/pstack/skills/poteto-mode/references/codex-tools.md). Model slugs are the Codex+Grok catalog; the same file holds the Grok runtime adapter and the Claude sidecar substitution. `poteto-mode` and every skill that names one of those carries a one-line **Platform note** pointing there.
+- **Tool, model, and built-in mapping.** When a skill names a Claude tool (the `Agent` tool, `AskUserQuestion`) or a Claude built-in skill (`run`, `verify`, `loop`, `plugin-dev:skill-development`), it resolves through [`skills/poteto-mode/references/codex-tools.md`](plugins/pstack/skills/poteto-mode/references/codex-tools.md). Model slugs are the Codex+Grok catalog; the same file holds the Grok runtime adapter. `poteto-mode` and every skill that names one of those carries a one-line **Platform note** pointing there.
 - **Subagents.** The `Agent` tool maps to Codex `spawn_agent` / `wait_agent` / `close_agent`, enabled by `multi_agent = true`. Parallel fan-out is multiple `spawn_agent` calls in one turn. Without the flag, `interrogate`, `arena`, `how`, `why`, `reflect`, and `architect` degrade to a single sequential pass. Codex pstack roles use the `default` agent type with explicit model and effort values. Put the semantic role in `task_name` and the prompt. The full request shape lives in [`codex-tools.md`](plugins/pstack/skills/poteto-mode/references/codex-tools.md).
-- **Auto-fire.** The `hooks/` SessionStart injection is Claude Code-only; Codex has no plugin hook runtime. Enter `pstack:poteto-mode` by name, or add a standing instruction to `~/.codex/AGENTS.md` if you want the same always-on routing.
-- **Models.** Role defaults are the Codex+Grok catalog, stamped into each skill's Models section from `plugins/pstack/models.json`. The default panel is `gpt-5.6-sol`, `gpt-5.6-luna`, `grok-4.6`. On Claude Code substitute the `claude` sidecar via `/setup-pstack`. `/setup-pstack` writes `~/.codex/pstack-models.md` (referenced from `~/.codex/AGENTS.md`) on Codex and `~/.claude/pstack-models.md` on Claude Code.
+- **Auto-fire.** Codex has no plugin hook runtime. Enter `pstack:poteto-mode` by name, or add a standing instruction to `~/.codex/AGENTS.md` if you want the same always-on routing.
+- **Models.** Role defaults are the Codex+Grok catalog, stamped into each skill's Models section from `plugins/pstack/models.json`. The default panel is `gpt-5.6-sol`, `gpt-5.6-luna`, `grok-4.6`. `/setup-pstack` writes `~/.codex/pstack-models.md` (referenced from `~/.codex/AGENTS.md`).
 
 Verified on a live Codex session installed via the symlinks: the user-facing skills are discovered and namespaced under `pstack` (`pstack:poteto-mode`, `pstack:interrogate`, and so on). The `principle-*` leaf skills carry `user-invocable: false` and no command, so Codex does not surface them in the picker, the same as Claude Code. They stay installed for `poteto-mode` to read by path. The deeper behaviors (mapping resolution mid-task, `spawn_agent` fan-out) follow the proven `superpowers` pattern and are worth confirming in your own session.
 
@@ -109,13 +93,13 @@ Verified on a live Codex session installed via the symlinks: the user-facing ski
 
 Two workflows run on every pull request and push to `main`.
 
-`ci.yml` runs four jobs: the static plugin invariants (`tests/skill-collision-repro.sh` under `SKIP_BEHAVIORAL=1`, since the behavioral leg needs the `claude` CLI and API access), a generated-files check (`bun tools/generate.mjs` followed by `git diff --exit-code`, so a `VERSION` bump that skips regeneration or the `CHANGES.md` entry fails the build), the vendored bun tooling (`bun install --frozen-lockfile`, `bun run typecheck`, `bun test orch watch-pr`), and `shellcheck` over every shell script, selected by `.sh` extension or by shebang so the extensionless hook scripts are covered.
+`ci.yml` runs four jobs: the static plugin invariants (`tests/skill-collision-repro.sh`), a generated-files check (`bun tools/generate.mjs` followed by `git diff --exit-code`, so a `VERSION` bump that skips regeneration or the `CHANGES.md` entry fails the build), the vendored bun tooling (`bun install --frozen-lockfile`, `bun run typecheck`, `bun test orch watch-pr`), and `shellcheck` over every shell script, selected by `.sh` extension or by shebang.
+
+`sync-upstream.yml` runs on a six-hour schedule and on `workflow_dispatch`. It opens a PR for new upstream SHAs and squash-merges only when the sync is clean.
 
 `security.yml` runs `osv-scanner` against the lockfiles and fails the build if no lockfile was found, because an empty scan reads exactly like a clean one. It also rejects any action reference not pinned to a full 40-character commit SHA. It runs weekly on top of the per-PR trigger, so a CVE published after a merge still surfaces. `zizmor` audits the workflows themselves for template injection, over-broad permissions, and credential persistence.
 
 Dependabot keeps the pinned SHAs and the bun dependencies current, on a 7-day cooldown so a compromised release has time to be reported before a PR opens. Because Dependabot cannot regenerate `bun.lock`, `dependabot-lockfile.yml` does it for its PRs and pushes the result back to the branch.
-
-Before a release, run the full `tests/skill-collision-repro.sh` locally (without `SKIP_BEHAVIORAL`) to exercise the behavioral leg CI cannot.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the sync boundary, the local checks to run, and the release rules.
 
@@ -180,9 +164,7 @@ No third-party plugins. The harsher-critique escape hatch lives in the bundled `
 
 ## Subagents
 
-`poteto-agent` ships unchanged. Spawn from a parent with `subagent_type: "poteto-agent"`.
-
-`comment-sicko` is the read-only comment reviewer the `no-comments` skill spawns. Upstream names it `Comment Sicko`; the port renames it to `comment-sicko` so the name is a valid `subagent_type`. Invoke it through `/no-comments`, not directly.
+Skill bodies still name `poteto-agent` and `comment-sicko` as Claude-shaped identifiers. This port does not ship `plugins/pstack/agents/`; Codex maps those names through [`codex-tools.md`](plugins/pstack/skills/poteto-mode/references/codex-tools.md).
 
 ## Differences from upstream
 
@@ -247,8 +229,7 @@ Editing skill bodies forks this from upstream. Re-syncing to a future pstack rel
 
 ## License
 
-MIT. Three upstream LICENSE files are preserved:
+MIT. Two upstream LICENSE files are preserved:
 
 - [LICENSE](LICENSE) — pstack (Lauren Tan)
 - [LICENSE-cursor-team-kit](LICENSE-cursor-team-kit) — Cursor (covers the `deslop` and `thermo-nuclear-code-quality-review` skills)
-- [LICENSE-superpowers](LICENSE-superpowers) — superpowers, Jesse Vincent (covers the vendored `hooks/run-hook.cmd`)

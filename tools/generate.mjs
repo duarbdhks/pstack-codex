@@ -5,13 +5,13 @@
 // so a stale committed copy fails the build instead of shipping.
 //
 // Sources of truth:
-//   VERSION  -> the "version" field in the three plugin manifests
+//   VERSION  -> the "version" field in the Codex plugin manifest
 //   CHANGES.md must carry a heading for the current VERSION (release completeness)
 //   each public skill's frontmatter (name + menu-description)
 //     -> its Codex prompt stub in plugins/pstack/.codex-plugin/prompts/
 //     -> its row in README.md's "Slash commands" table
 //   plugins/pstack/models.json (the model policy: role defaults, diverse panel,
-//   available slugs, Claude sidecar)
+//   available slugs)
 //     -> each model-consuming skill's "## Models" section
 //     -> setup-pstack's override-sheet block and interrogate's reviewer table
 //     -> the "## Model names" section of poteto-mode/references/codex-tools.md
@@ -29,8 +29,6 @@ import { fileURLToPath } from "node:url";
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 const VERSIONED_MANIFESTS = [
-  ".claude-plugin/marketplace.json",
-  "plugins/pstack/.claude-plugin/plugin.json",
   "plugins/pstack/.codex-plugin/plugin.json",
 ];
 
@@ -128,7 +126,7 @@ export function modelsSection(roles) {
   const bullets = roles.map((r) => `- ${r.role}: ${codeList(r.models)}`).join("\n");
   return (
     "Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). " +
-    "A matching role line in `~/.claude/pstack-models.md` (Claude Code) or `~/.codex/pstack-models.md` (Codex) " +
+    "A matching role line in `~/.codex/pstack-models.md` " +
     "overrides each at runtime; see `/setup-pstack`.\n\n" +
     bullets
   );
@@ -136,16 +134,11 @@ export function modelsSection(roles) {
 
 export function setupModelsSection(models) {
   const avail = models.available.map((m) => `${m.label} (${code(m.slug)})`).join(", ");
-  const claude = models.claude;
-  const claudeLine = claude
-    ? `\n- Claude Code sidecar: default ${code(claude.singleRoleDefault)}, panel ${codeList(claude.panel)}; available ${claude.available.map((m) => `${m.label} (${code(m.slug)})`).join(", ")}`
-    : "";
   return (
     "Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`).\n\n" +
     `- Available models: ${avail}\n` +
     `- Default panel: ${codeList(models.panel)}\n` +
-    `- Single-role default: ${code(models.singleRoleDefault)}` +
-    claudeLine
+    `- Single-role default: ${code(models.singleRoleDefault)}`
   );
 }
 
@@ -188,16 +181,10 @@ export function stampReviewerTable(text, models, file) {
 }
 
 export function codexModelNamesSection(models) {
-  const claude = models.claude;
-  const claudeHint = claude
-    ? ` On Claude Code substitute the sidecar catalog (single-role ${code(claude.singleRoleDefault)}, panel ${codeList(claude.panel)}) via \`/setup-pstack\`.`
-    : "";
   const [sol, luna, grok] = models.panel;
   return (
     "Skills name Codex+Grok defaults (a single-role default for code/prose/judgment plus a diverse-model panel; " +
-    "each model-consuming skill lists its own in a Models section). These slugs do not resolve on Claude Code." +
-    claudeHint +
-    " On Codex they work as written. On Grok, map through the runtime adapter below.\n\n" +
+    "each model-consuming skill lists its own in a Models section). On Codex they work as written. On Grok, map through the runtime adapter below.\n\n" +
     `- Single-model roles: judgment, implementation, and synthesis use ${code(models.singleRoleDefault)}; exploration and volume work use the explorer/worker roles stamped per skill.\n` +
     `- Diverse-model panels (\`arena\`, \`architect\`, \`interrogate\`, \`how\` critics): ${codeList(models.panel)}. If a runtime cannot reach a family, vary remaining models and note that diversity was reduced.\n\n` +
     "Runtime adapter (canonical slug to spawn id):\n\n" +
@@ -283,32 +270,6 @@ export function renderReadmeTable(readme, skills) {
   const rows = README_COMMAND_ORDER.map((n) => `| \`/${n}\` | ${byName.get(n).menu} |`);
   lines.splice(header, end - header, "| command | use it when |", "| --- | --- |", ...rows);
   return lines.join("\n");
-}
-
-// hooks.json names commands as "${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd <script>";
-// both the runner and the named script must exist in the plugin and be
-// executable, or the SessionStart hook fails silently for every user.
-export function validateHooks(hooksJson, { statOf }) {
-  const problems = [];
-  for (const [event, groups] of Object.entries(JSON.parse(hooksJson).hooks ?? {})) {
-    for (const group of groups) {
-      for (const hook of group.hooks ?? []) {
-        const m = hook.command?.match(/\$\{CLAUDE_PLUGIN_ROOT\}\/([^"\s]+)"?(?:\s+(\S+))?/);
-        if (!m) {
-          problems.push(`${event}: command does not reference \${CLAUDE_PLUGIN_ROOT}: ${hook.command}`);
-          continue;
-        }
-        const targets = [m[1]];
-        if (m[1].endsWith("run-hook.cmd") && m[2]) targets.push(`hooks/${m[2]}`);
-        for (const t of targets) {
-          const st = statOf(t);
-          if (!st) problems.push(`${event}: ${t} does not exist`);
-          else if (!(st.mode & 0o111)) problems.push(`${event}: ${t} is not executable`);
-        }
-      }
-    }
-  }
-  if (problems.length) throw new Error(`hooks.json:\n  ${problems.join("\n  ")}`);
 }
 
 function main() {
@@ -430,12 +391,6 @@ function main() {
     pathExists: (p) => existsSync(join(repo, p)),
   });
   console.log("ok: .agents/plugins/marketplace.json names the plugin and points at a real path");
-
-  const pluginRoot = join(repo, "plugins/pstack");
-  validateHooks(readFileSync(join(pluginRoot, "hooks/hooks.json"), "utf8"), {
-    statOf: (rel) => (existsSync(join(pluginRoot, rel)) ? statSync(join(pluginRoot, rel)) : null),
-  });
-  console.log("ok: hooks.json commands point at existing, executable scripts");
 }
 
 try {

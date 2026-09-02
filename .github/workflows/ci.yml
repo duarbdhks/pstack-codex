@@ -22,11 +22,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # The behavioral leg needs the claude CLI and API access, so it is skipped
-      # here; SKIP_BEHAVIORAL keeps the static invariants running.
       - name: Run static invariants
-        env:
-          SKIP_BEHAVIORAL: "1"
         run: bash tests/skill-collision-repro.sh
 
   generated:
@@ -77,10 +73,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # Select by extension OR shebang. The hook scripts are deliberately
-      # extensionless (Claude Code's Windows auto-detection prepends "bash" to
-      # any command containing ".sh"), so an extension-only glob skipped the
-      # one script that runs at every user's session start.
+      # Select by extension OR shebang so a script without .sh is still linted.
       - name: Run shellcheck
         run: |
           shellcheck --version

@@ -1,0 +1,149 @@
+name: Sync upstream
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync upstream
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: true
+          ref: ${{ github.event.repository.default_branch }}
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.3.14"
+      - name: Sync, PR, and maybe merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          remote="$(jq -r .remote tools/upstream.json)"
+          scratch="$(mktemp -d)"
+          report="$(mktemp)"
+          trap 'rm -rf "$scratch" "$report"' EXIT
+          git clone --quiet --filter=blob:none --no-checkout "$remote" "$scratch"
+
+          any_sync=0
+          all_ok=1
+
+          sync_one() {
+            local component="$1"
+            local pin upstreamPath latest pin_full code out
+            pin="$(jq -r --arg c "$component" '.components[$c].sha' tools/upstream.json)"
+            upstreamPath="$(jq -r --arg c "$component" '.components[$c].upstreamPath' tools/upstream.json)"
+            latest="$(git -C "$scratch" log -1 --format=%H HEAD -- "$upstreamPath")"
+            if [ -z "$latest" ]; then
+              all_ok=0
+              {
+                printf '## %s\n' "$component"
+                printf 'failed: no HEAD commit for %s\n\n' "$upstreamPath"
+              } >> "$report"
+              return 0
+            fi
+            pin_full="$(git -C "$scratch" rev-parse "${pin}^{commit}")"
+            if [ "$pin_full" = "$latest" ]; then
+              {
+                printf '## %s\n' "$component"
+                printf 'skipped: pin %s is current\n\n' "$pin_full"
+              } >> "$report"
+              return 0
+            fi
+            any_sync=1
+            set +e
+            out="$(bun tools/sync.mjs "$component" "$latest" 2>&1)"
+            code=$?
+            set -e
+            {
+              printf '## %s\n' "$component"
+              printf 'exit: %s\n' "$code"
+              printf '%s\n\n' "$out"
+            } >> "$report"
+            if [ "$code" -ne 0 ]; then
+              all_ok=0
+            fi
+            if printf '%s\n' "$out" | grep -q 'needs manual merge'; then
+              all_ok=0
+            fi
+          }
+
+          sync_one pstack
+          sync_one cursor-team-kit
+
+          if [ "$any_sync" -eq 0 ]; then
+            echo "ok: every component skipped"
+            exit 0
+          fi
+
+          open_count="$(gh pr list --head sync/upstream --state open --json number --jq 'length')"
+          if [ "$open_count" != "0" ]; then
+            echo "ok: open PR already exists for sync/upstream; not force-pushing"
+            exit 0
+          fi
+
+          set +e
+          bun tools/generate.mjs
+          gen_code=$?
+          set -e
+          if [ "$gen_code" -ne 0 ]; then
+            all_ok=0
+            printf '## generate\nexit: %s\n\n' "$gen_code" >> "$report"
+          fi
+
+          if git diff --quiet && git diff --cached --quiet && [ -z "$(git ls-files --others --exclude-standard)" ]; then
+            echo "ok: no diff after generate"
+            exit 0
+          fi
+
+          git checkout -B sync/upstream
+          git add -A
+          git commit -m "chore(sync): upstream pstack/cursor-team-kit"
+          git push -u origin sync/upstream
+
+          if [ "$(gh pr list --head sync/upstream --state open --json number --jq 'length')" = "0" ]; then
+            body="$(mktemp)"
+            {
+              printf '%s\n\n' "Automated upstream sync."
+              cat "$report"
+            } > "$body"
+            gh pr create --base "$DEFAULT_BRANCH" --head sync/upstream --title "chore(sync): upstream pstack/cursor-team-kit" --body-file "$body"
+            rm -f "$body"
+          fi
+
+          verify_ok=1
+          set +e
+          bash tests/skill-collision-repro.sh || verify_ok=0
+          bun tools/generate.mjs && git diff --exit-code || verify_ok=0
+          bun test tests/ || verify_ok=0
+          (
+            cd plugins/pstack/skills/poteto-mode/scripts && bun install --frozen-lockfile && bun run typecheck && bun test orch watch-pr
+          ) || verify_ok=0
+          {
+            find . -path ./.git -prune -o -path '*/node_modules' -prune -o -name '*.sh' -print
+            grep -rlE --exclude-dir=.git --exclude-dir=node_modules '^#!/(usr/bin/env )?(ba)?sh' .
+          } | sed 's#^\./##' | sort -u | tee /dev/stderr | xargs shellcheck --severity=warning || verify_ok=0
+          set -e
+
+          if [ "$all_ok" -eq 1 ] && [ "$verify_ok" -eq 1 ]; then
+            gh pr merge sync/upstream --squash --delete-branch
+          else
+            echo "leaving PR open (all_ok=$all_ok verify_ok=$verify_ok)"
+          fi

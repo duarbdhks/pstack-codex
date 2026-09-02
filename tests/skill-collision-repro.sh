@@ -8,8 +8,7 @@
 # future upstream sync from reintroducing plugins/pstack/commands/.
 #
 # This also enforces the static maintenance invariants from CHANGES.md: the
-# principle-* leaf flags. The static checks need no CLI; only the behavioral
-# leg below does. (Version parity, the model quad, and prompt<->skill
+# principle-* leaf flags. (Version parity, the model quad, and prompt<->skill
 # correspondence are no longer checked here: tools/generate.mjs stamps each
 # from its source file and CI regenerates and diffs, so none can drift on a
 # green build.)
@@ -18,8 +17,6 @@
 # output is a pass. `check` names it in the report. tests/invariants.test.mjs
 # runs this script against fixture trees (via PSTACK_REPO) to prove every
 # check still fails when it should.
-#
-# Manual test: the behavioral leg needs the claude CLI and API access; one haiku call.
 set -euo pipefail
 
 repo="${PSTACK_REPO:-$(cd "$(dirname "$0")/.." && pwd)}"
@@ -121,40 +118,5 @@ check "no plugins/pstack/commands/ directory" no_commands_dir
 check "no skill carries disable-model-invocation: true" no_disable_model_invocation
 check "principle-* leaves carry user-invocable: false and not disable-model-invocation" principle_leaves_hidden
 check "Codex pstack dispatch uses the default agent with explicit policy" codex_dispatch_uses_default_agent
-
-# Behavioral leg: a command-less plugin still serves the user-typed /plugin:name
-# via the skill alone. This is the assumption that lets pstack live without
-# trampolines; if it fails, upstream changed slash resolution — re-read #22 and
-# CHANGES 0.9.13 before reintroducing commands/. Last verified on 2.1.245.
-#
-# Needs the claude CLI and API access, so CI sets SKIP_BEHAVIORAL=1 and runs the
-# static invariants only. Run it locally before a release.
-if [ -n "${SKIP_BEHAVIORAL:-}" ]; then
-  note "skip: behavioral leg (SKIP_BEHAVIORAL set); static invariants only"
-  exit "$fail"
-fi
-
-scratch="$(mktemp -d)"
-trap 'rm -rf "$scratch"' EXIT
-mkdir -p "$scratch/.claude-plugin" "$scratch/skills/foo"
-printf '%s\n' '{"name": "testplug", "version": "0.0.1", "description": "skill-only slash repro"}' \
-  > "$scratch/.claude-plugin/plugin.json"
-cat > "$scratch/skills/foo/SKILL.md" <<'EOF'
----
-name: foo
-description: skill-only slash test
----
-
-Say exactly: SKILL-RAN
-Then stop. Do not invoke any skill or tool.
-EOF
-
-out="$(claude -p --plugin-dir "$scratch" --model haiku --max-turns 3 '/testplug:foo' < /dev/null 2>&1)"
-if printf '%s' "$out" | grep -q 'SKILL-RAN'; then
-  note "ok: user-typed /plugin:name reaches the skill with no commands/ present"
-else
-  note "FAIL: /testplug:foo did not run the skill, got: $out"
-  fail=1
-fi
 
 exit "$fail"
