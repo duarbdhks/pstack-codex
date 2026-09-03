@@ -105,16 +105,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the sync boundary, the local checks t
 
 ## Dependencies
 
-Nothing is declared in `plugin.json`. Install the one companion plugin yourself:
-
-- **`plugin-dev`** (from the `claude-plugins-official` marketplace) — the rewiring routes skill-authoring tasks (in `automate-me`, `reflect`, `poteto-mode`) to the `plugin-dev:skill-development` skill:
-
-  ```shell
-  /plugin marketplace add anthropics/claude-plugins-official
-  /plugin install plugin-dev@claude-plugins-official
-  ```
-
-  Until 0.9.2 this was a `dependencies` entry in `plugin.json`. The desktop app's `--plugin-dir` load mode can never resolve cross-marketplace dependencies and hard-disables the whole plugin, so 0.9.3 removed the declaration — full mechanism in the 0.9.3 entry of [CHANGES.md](CHANGES.md). Without `plugin-dev` installed, only the skill-authoring routes degrade; everything else works.
+Nothing is declared in `plugin.json`. Skill-authoring routes in `automate-me`, `reflect`, and `poteto-mode` name `plugin-dev:skill-development`. That skill ships with Claude Code. On Codex, follow [`codex-tools.md`](plugins/pstack/skills/poteto-mode/references/codex-tools.md) and the `writing-skills` skill if present. Without it, only those authoring routes degrade. The 0.9.3 entry of [CHANGES.md](CHANGES.md) records why this is not a plugin dependency.
 
 Not declared as deps, but referenced in skill bodies:
 

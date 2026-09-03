@@ -39,7 +39,7 @@ poteto-mode's Subagents section sets Claude-specific defaults (`subagent_type: "
 |------------|-------|------|
 | `poteto-agent` | `spawn_agent` with `agent_type="default"`; `task_name="poteto-agent"`; prompt reads the `poteto-mode` skill's `SKILL.md` in full first, including Principles | `spawn_subagent` with `subagent_type="pstack:poteto-agent"`; prompt still reads that skill in full first |
 | `general-purpose` | `agent_type="default"` | `subagent_type="general-purpose"` |
-| `comment-sicko` | `agent_type="default"`; prompt reads `agents/comment-sicko.md` in full first | `subagent_type="pstack:Comment Sicko"` |
+| `comment-sicko` | `agent_type="default"`; prompt reads `plugins/pstack/skills/no-comments/SKILL.md` in full first | `spawn_subagent` with `subagent_type="general-purpose"`; prompt reads that skill in full first |
 
 `explore` / `explorer` are not pstack role carriers. Investigation roles stay on this map: Codex `default` plus the Luna row in `pstack-models.md`. Grok's built-in `explore` is read-only lookup, not a poteto implementation delegate.
 
