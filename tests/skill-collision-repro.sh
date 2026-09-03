@@ -114,9 +114,25 @@ codex_dispatch_uses_default_agent() {
   return 0
 }
 
+# comment-sicko is a child prompt, not the no-comments orchestrator. Mapping
+# that child at no-comments/SKILL.md makes the child spawn itself.
+comment_sicko_prompt_not_orchestrator() {
+  local mapping="$repo/plugins/pstack/skills/poteto-mode/references/codex-tools.md"
+  [ -f "$mapping" ] || return 0
+  if grep -q 'comment-sicko' "$mapping"; then
+    if grep 'comment-sicko' "$mapping" | grep -q 'no-comments/SKILL.md'; then
+      echo "$mapping (comment-sicko prompt must not be no-comments/SKILL.md)"
+    fi
+    local prompt="$repo/plugins/pstack/skills/no-comments/references/comment-sicko.md"
+    [ -f "$prompt" ] || echo "$prompt (missing)"
+  fi
+  return 0
+}
+
 check "no plugins/pstack/commands/ directory" no_commands_dir
 check "no skill carries disable-model-invocation: true" no_disable_model_invocation
 check "principle-* leaves carry user-invocable: false and not disable-model-invocation" principle_leaves_hidden
 check "Codex pstack dispatch uses the default agent with explicit policy" codex_dispatch_uses_default_agent
+check "comment-sicko prompt is not no-comments/SKILL.md" comment_sicko_prompt_not_orchestrator
 
 exit "$fail"

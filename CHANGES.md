@@ -2,6 +2,10 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.18 — give comment-sicko its own prompt
+
+`codex-tools.md` mapped `comment-sicko` at `no-comments/SKILL.md`. That skill's first step spawns `comment-sicko`, so Codex and Grok children loop. The prompt now lives at `plugins/pstack/skills/no-comments/references/comment-sicko.md`. The mapping reads that file. The invariant script fails if the mapping points at the orchestrator skill or the prompt file is missing.
+
 ## 0.9.17 — stamp Codex+Grok defaults
 
 `plugins/pstack/models.json` no longer stamps Claude family slugs as the plugin defaults. Single-model roles follow the Codex split: judgment, implementation, and synthesis use `gpt-5.6-sol`; exploration and volume work use `gpt-5.6-luna`. The four panels (`how critics`, `arena runners`, `architect runners`, `interrogate reviewers`) run the three-model panel `gpt-5.6-sol`, `gpt-5.6-luna`, `grok-4.6`. There is no `claude` key in `models.json`. `/setup-pstack` still writes a Claude Code override sheet when that runtime is the session. The generator restamps Models sections, the interrogate reviewer table, setup-pstack's override sheet, and `codex-tools.md` Model names (including the Codex/Grok runtime adapter). Stray-slug scanning now covers `gpt-5*`, `grok-4*`, and `ocx-*` as well as `claude-*`.
