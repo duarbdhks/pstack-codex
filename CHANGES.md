@@ -2,9 +2,9 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
-## 0.9.17 — stamp Codex+Grok defaults, keep Claude as a sidecar
+## 0.9.17 — stamp Codex+Grok defaults
 
-`plugins/pstack/models.json` no longer stamps Claude family slugs as the plugin defaults. Single-model roles follow the Codex split: judgment, implementation, and synthesis use `gpt-5.6-sol`; exploration and volume work use `gpt-5.6-luna`. The four panels (`how critics`, `arena runners`, `architect runners`, `interrogate reviewers`) run the three-model panel `gpt-5.6-sol`, `gpt-5.6-luna`, `grok-4.6`. The previous Claude catalog moves to a `claude` sidecar so `/setup-pstack` can still restore Claude Code slugs. The generator restamps Models sections, the interrogate reviewer table, setup-pstack's override sheet, and `codex-tools.md` Model names (including the Codex/Grok runtime adapter). Stray-slug scanning now covers `gpt-5*`, `grok-4*`, and `ocx-*` as well as `claude-*`.
+`plugins/pstack/models.json` no longer stamps Claude family slugs as the plugin defaults. Single-model roles follow the Codex split: judgment, implementation, and synthesis use `gpt-5.6-sol`; exploration and volume work use `gpt-5.6-luna`. The four panels (`how critics`, `arena runners`, `architect runners`, `interrogate reviewers`) run the three-model panel `gpt-5.6-sol`, `gpt-5.6-luna`, `grok-4.6`. There is no `claude` key in `models.json`. `/setup-pstack` still writes a Claude Code override sheet when that runtime is the session. The generator restamps Models sections, the interrogate reviewer table, setup-pstack's override sheet, and `codex-tools.md` Model names (including the Codex/Grok runtime adapter). Stray-slug scanning now covers `gpt-5*`, `grok-4*`, and `ocx-*` as well as `claude-*`.
 
 ## 0.9.16 — keep Codex pstack effort policy on the default agent
 
