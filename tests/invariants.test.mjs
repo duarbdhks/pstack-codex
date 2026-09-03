@@ -121,4 +121,30 @@ describe("skill-collision-repro.sh static invariants", () => {
     expect(out).toContain("FAIL: Codex pstack dispatch uses the default agent with explicit policy");
     expect(out).toContain(expected);
   });
+
+  test("comment-sicko mapped to no-comments/SKILL.md fails", () => {
+    const dir = fixture((d) =>
+      codexTools(
+        d,
+        `${CODEX_DISPATCH_CONTRACT}\n| \`comment-sicko\` | prompt reads \`plugins/pstack/skills/no-comments/SKILL.md\` |\n`,
+      ),
+    );
+    const { code, out } = run(dir);
+    expect(code).toBe(1);
+    expect(out).toContain("FAIL: comment-sicko prompt is not no-comments/SKILL.md");
+    expect(out).toContain("comment-sicko prompt must not be no-comments/SKILL.md");
+  });
+
+  test("comment-sicko row without the prompt file fails", () => {
+    const dir = fixture((d) =>
+      codexTools(
+        d,
+        `${CODEX_DISPATCH_CONTRACT}\n| \`comment-sicko\` | prompt reads \`plugins/pstack/skills/no-comments/references/comment-sicko.md\` |\n`,
+      ),
+    );
+    const { code, out } = run(dir);
+    expect(code).toBe(1);
+    expect(out).toContain("FAIL: comment-sicko prompt is not no-comments/SKILL.md");
+    expect(out).toContain("references/comment-sicko.md (missing)");
+  });
 });
