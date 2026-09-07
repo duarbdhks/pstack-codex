@@ -141,5 +141,5 @@ Present the explanation first (from Step 1), then the critique verdict below it.
 Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.codex/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
 
 - how explorer: `gpt-5.6-luna`
-- how explainer: `gpt-5.6-sol`
-- how critics: `gpt-5.6-sol`, `gpt-5.6-luna`, `grok-4.6`
+- how explainer: `gpt-6-astra`
+- how critics: `gpt-6-astra`, `gpt-5.6-luna`, `grok-4.6`

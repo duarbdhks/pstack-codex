@@ -83,4 +83,4 @@ Short list, no preamble:
 Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.codex/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
 
 - reflect tooling: `gpt-5.6-luna`
-- reflect judgment, divergent, synthesizer: `gpt-5.6-sol`
+- reflect judgment, divergent, synthesizer: `gpt-6-astra`

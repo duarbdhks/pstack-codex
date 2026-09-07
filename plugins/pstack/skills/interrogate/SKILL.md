@@ -39,7 +39,7 @@ Launch all reviewers in a single message using the `Agent` tool. Use the `interr
 
 | Subagent | Default model |
 |----------|---------------|
-| Reviewer A | `gpt-5.6-sol` |
+| Reviewer A | `gpt-6-astra` |
 | Reviewer B | `gpt-5.6-luna` |
 | Reviewer C | `grok-4.6` |
 

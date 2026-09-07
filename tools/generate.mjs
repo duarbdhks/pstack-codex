@@ -180,16 +180,20 @@ export function stampReviewerTable(text, models, file) {
   return lines.join("\n");
 }
 
+function ocxSlug(canonical) {
+  return `ocx-${canonical.replaceAll(".", "-")}`;
+}
+
 export function codexModelNamesSection(models) {
-  const [sol, luna, grok] = models.panel;
+  const [lead, luna, grok] = models.panel;
   return (
     "Skills name Codex+Grok defaults (a single-role default for code/prose/judgment plus a diverse-model panel; " +
     "each model-consuming skill lists its own in a Models section). On Codex they work as written. On Grok, map through the runtime adapter below.\n\n" +
     `- Single-model roles: judgment, implementation, and synthesis use ${code(models.singleRoleDefault)}; exploration and volume work use the explorer/worker roles stamped per skill.\n` +
     `- Diverse-model panels (\`arena\`, \`architect\`, \`interrogate\`, \`how\` critics): ${codeList(models.panel)}. If a runtime cannot reach a family, vary remaining models and note that diversity was reduced.\n\n` +
     "Runtime adapter (canonical slug to spawn id):\n\n" +
-    `- Codex: ${code(sol)} stays ${code(sol)}; ${code(luna)} stays ${code(luna)}; ${code(grok)} becomes ${code("xai/grok-4.6")} when the OpenCodex Grok override is active, otherwise skip that panel seat or pick another available family.\n` +
-    `- Grok: ${code(sol)} becomes ${code("ocx-gpt-5-6-sol")}; ${code(luna)} becomes ${code("ocx-gpt-5-6-luna")}; ${code(grok)} stays ${code(grok)}.\n\n` +
+    `- Codex: ${code(lead)} stays ${code(lead)}; ${code(luna)} stays ${code(luna)}; ${code(grok)} becomes ${code("xai/grok-4.6")} when the OpenCodex Grok override is active, otherwise skip that panel seat or pick another available family.\n` +
+    `- Grok: ${code(lead)} becomes ${code(ocxSlug(lead))}; ${code(luna)} becomes ${code(ocxSlug(luna))}; ${code(grok)} stays ${code(grok)}.\n\n` +
     "`/setup-pstack` writes the configured model list."
   );
 }
@@ -198,7 +202,7 @@ export function codexModelNamesSection(models) {
 // generator-owned regions. The scan blanks each owned line range (keeping
 // line numbers stable) and reports whatever still matches.
 const SLUG_RE =
-  /\b(?:claude-(?:opus|fable|sonnet|haiku)[0-9a-z.-]*|gpt-5(?:\.\d+)?(?:-[a-z0-9]+)*|grok-4(?:\.\d+)?(?:-[a-z0-9]+)*|ocx-(?:gpt|xai|anthropic)[0-9a-z.-]*|xai\/grok-4(?:\.\d+)?)\b/;
+  /\b(?:claude-(?:opus|fable|sonnet|haiku)[0-9a-z.-]*|gpt-(?:5|6)(?:\.\d+)?(?:-[a-z0-9]+)*|grok-4(?:\.\d+)?(?:-[a-z0-9]+)*|ocx-(?:gpt|xai|anthropic)[0-9a-z.-]*|xai\/grok-4(?:\.\d+)?)\b/;
 
 // [start, end) line ranges of every generator-owned region in this file.
 export function ownedRanges(lines) {

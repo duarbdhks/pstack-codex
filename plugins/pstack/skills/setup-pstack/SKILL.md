@@ -45,24 +45,24 @@ Write the override sheet (`~/.claude/pstack-models.md` on Claude Code, `~/.codex
 
 Per-role model overrides for pstack skills. Each pstack SKILL.md names its defaults in a Models section; the values here override those defaults. Delete a line to fall back to the skill default. A value of `inherit-parent` or `auto` runs that role on the parent session's model (the `Agent` call omits `model`); an alias entry in a panel list still counts toward that panel's fan-out.
 
-feature, refactoring: gpt-5.6-sol
-bug-fix: gpt-5.6-sol
-perf-issue: gpt-5.6-sol
-hillclimb: gpt-5.6-sol
-judgment and prose: gpt-5.6-sol
-strongest judgment: gpt-5.6-sol
+feature, refactoring: gpt-6-astra
+bug-fix: gpt-6-astra
+perf-issue: gpt-6-astra
+hillclimb: gpt-6-astra
+judgment and prose: gpt-6-astra
+strongest judgment: gpt-6-astra
 how explorer: gpt-5.6-luna
-how explainer: gpt-5.6-sol
-how critics: gpt-5.6-sol, gpt-5.6-luna, grok-4.6
+how explainer: gpt-6-astra
+how critics: gpt-6-astra, gpt-5.6-luna, grok-4.6
 why investigators: gpt-5.6-luna
-why synthesizer: gpt-5.6-sol
+why synthesizer: gpt-6-astra
 reflect tooling: gpt-5.6-luna
-reflect judgment, divergent, synthesizer: gpt-5.6-sol
-arena runners: gpt-5.6-sol, gpt-5.6-luna, grok-4.6
-arena cross-judge pool: gpt-5.6-sol, gpt-5.6-luna, grok-4.6
+reflect judgment, divergent, synthesizer: gpt-6-astra
+arena runners: gpt-6-astra, gpt-5.6-luna, grok-4.6
+arena cross-judge pool: gpt-6-astra, gpt-5.6-luna, grok-4.6
 swarm workers: gpt-5.6-luna
-architect runners: gpt-5.6-sol, gpt-5.6-luna, grok-4.6
-interrogate reviewers: gpt-5.6-sol, gpt-5.6-luna, grok-4.6
+architect runners: gpt-6-astra, gpt-5.6-luna, grok-4.6
+interrogate reviewers: gpt-6-astra, gpt-5.6-luna, grok-4.6
 ```
 
 ### 6. Wire it in
@@ -77,6 +77,6 @@ Tell the user where the override was written and how it loads (the `@` include i
 
 Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`).
 
-- Available models: GPT-5.6 Sol (`gpt-5.6-sol`), GPT-5.6 Luna (`gpt-5.6-luna`), Grok 4.6 (`grok-4.6`), GPT-5.5 (`gpt-5.5`), GPT-5.4 (`gpt-5.4`)
-- Default panel: `gpt-5.6-sol`, `gpt-5.6-luna`, `grok-4.6`
-- Single-role default: `gpt-5.6-sol`
+- Available models: GPT-6 Astra (`gpt-6-astra`), GPT-5.6 Sol (`gpt-5.6-sol`), GPT-5.6 Luna (`gpt-5.6-luna`), Grok 4.6 (`grok-4.6`), GPT-5.5 (`gpt-5.5`), GPT-5.4 (`gpt-5.4`)
+- Default panel: `gpt-6-astra`, `gpt-5.6-luna`, `grok-4.6`
+- Single-role default: `gpt-6-astra`

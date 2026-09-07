@@ -2,6 +2,10 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.19 — default judgment roles to Astra
+
+`plugins/pstack/models.json` moves the single-role default and the first panel seat from `gpt-5.6-sol` to `gpt-6-astra`. Exploration and volume roles stay on `gpt-5.6-luna`. The three-model panel is `gpt-6-astra`, `gpt-5.6-luna`, `grok-4.6`. Sol remains in the available-model list for `/setup-pstack` overrides. The Grok runtime adapter now derives `ocx-*` spawn ids from the canonical slug (`gpt-6-astra` → `ocx-gpt-6-astra`) instead of hardcoding Sol. Stray-slug scanning covers `gpt-6*` as well as `gpt-5*`.
+
 ## 0.9.18 — give comment-sicko its own prompt
 
 `codex-tools.md` mapped `comment-sicko` at `no-comments/SKILL.md`. That skill's first step spawns `comment-sicko`, so Codex and Grok children loop. The prompt now lives at `plugins/pstack/skills/no-comments/references/comment-sicko.md`. The mapping reads that file. The invariant script fails if the mapping points at the orchestrator skill or the prompt file is missing.

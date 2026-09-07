@@ -1,7 +1,8 @@
 {
-  "singleRoleDefault": "gpt-5.6-sol",
-  "panel": ["gpt-5.6-sol", "gpt-5.6-luna", "grok-4.6"],
+  "singleRoleDefault": "gpt-6-astra",
+  "panel": ["gpt-6-astra", "gpt-5.6-luna", "grok-4.6"],
   "available": [
+    { "label": "GPT-6 Astra", "slug": "gpt-6-astra" },
     { "label": "GPT-5.6 Sol", "slug": "gpt-5.6-sol" },
     { "label": "GPT-5.6 Luna", "slug": "gpt-5.6-luna" },
     { "label": "Grok 4.6", "slug": "grok-4.6" },
@@ -9,23 +10,23 @@
     { "label": "GPT-5.4", "slug": "gpt-5.4" }
   ],
   "roles": [
-    { "role": "feature, refactoring", "models": ["gpt-5.6-sol"], "skill": "poteto-mode" },
-    { "role": "bug-fix", "models": ["gpt-5.6-sol"], "skill": "poteto-mode" },
-    { "role": "perf-issue", "models": ["gpt-5.6-sol"], "skill": "poteto-mode" },
-    { "role": "hillclimb", "models": ["gpt-5.6-sol"], "skill": "poteto-mode" },
-    { "role": "judgment and prose", "models": ["gpt-5.6-sol"], "skill": "poteto-mode" },
-    { "role": "strongest judgment", "models": ["gpt-5.6-sol"], "skill": "poteto-mode" },
+    { "role": "feature, refactoring", "models": ["gpt-6-astra"], "skill": "poteto-mode" },
+    { "role": "bug-fix", "models": ["gpt-6-astra"], "skill": "poteto-mode" },
+    { "role": "perf-issue", "models": ["gpt-6-astra"], "skill": "poteto-mode" },
+    { "role": "hillclimb", "models": ["gpt-6-astra"], "skill": "poteto-mode" },
+    { "role": "judgment and prose", "models": ["gpt-6-astra"], "skill": "poteto-mode" },
+    { "role": "strongest judgment", "models": ["gpt-6-astra"], "skill": "poteto-mode" },
     { "role": "how explorer", "models": ["gpt-5.6-luna"], "skill": "how" },
-    { "role": "how explainer", "models": ["gpt-5.6-sol"], "skill": "how" },
-    { "role": "how critics", "models": ["gpt-5.6-sol", "gpt-5.6-luna", "grok-4.6"], "skill": "how" },
+    { "role": "how explainer", "models": ["gpt-6-astra"], "skill": "how" },
+    { "role": "how critics", "models": ["gpt-6-astra", "gpt-5.6-luna", "grok-4.6"], "skill": "how" },
     { "role": "why investigators", "models": ["gpt-5.6-luna"], "skill": "why" },
-    { "role": "why synthesizer", "models": ["gpt-5.6-sol"], "skill": "why" },
+    { "role": "why synthesizer", "models": ["gpt-6-astra"], "skill": "why" },
     { "role": "reflect tooling", "models": ["gpt-5.6-luna"], "skill": "reflect" },
-    { "role": "reflect judgment, divergent, synthesizer", "models": ["gpt-5.6-sol"], "skill": "reflect" },
-    { "role": "arena runners", "models": ["gpt-5.6-sol", "gpt-5.6-luna", "grok-4.6"], "skill": "arena" },
-    { "role": "arena cross-judge pool", "models": ["gpt-5.6-sol", "gpt-5.6-luna", "grok-4.6"], "skill": "arena" },
+    { "role": "reflect judgment, divergent, synthesizer", "models": ["gpt-6-astra"], "skill": "reflect" },
+    { "role": "arena runners", "models": ["gpt-6-astra", "gpt-5.6-luna", "grok-4.6"], "skill": "arena" },
+    { "role": "arena cross-judge pool", "models": ["gpt-6-astra", "gpt-5.6-luna", "grok-4.6"], "skill": "arena" },
     { "role": "swarm workers", "models": ["gpt-5.6-luna"], "skill": "swarm" },
-    { "role": "architect runners", "models": ["gpt-5.6-sol", "gpt-5.6-luna", "grok-4.6"], "skill": "architect" },
-    { "role": "interrogate reviewers", "models": ["gpt-5.6-sol", "gpt-5.6-luna", "grok-4.6"], "skill": "interrogate" }
+    { "role": "architect runners", "models": ["gpt-6-astra", "gpt-5.6-luna", "grok-4.6"], "skill": "architect" },
+    { "role": "interrogate reviewers", "models": ["gpt-6-astra", "gpt-5.6-luna", "grok-4.6"], "skill": "interrogate" }
   ]
 }

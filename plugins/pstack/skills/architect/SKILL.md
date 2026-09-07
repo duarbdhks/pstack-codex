@@ -88,4 +88,4 @@ The caller's usage is written first and the type sketch derived from it. One fil
 
 Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.codex/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
 
-- architect runners: `gpt-5.6-sol`, `gpt-5.6-luna`, `grok-4.6`
+- architect runners: `gpt-6-astra`, `gpt-5.6-luna`, `grok-4.6`
