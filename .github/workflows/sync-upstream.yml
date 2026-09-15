@@ -94,10 +94,18 @@ jobs:
             exit 0
           fi
 
-          open_count="$(gh pr list --head sync/upstream --state open --json number --jq 'length')"
-          if [ "$open_count" != "0" ]; then
-            echo "ok: open PR already exists for sync/upstream; not force-pushing"
-            exit 0
+          # An open sync PR is stale once upstream moves again. Refresh it in
+          # place while every commit on the branch is ours; a human commit
+          # means someone is mid-review, so report and leave the branch alone.
+          pr_number="$(gh pr list --head sync/upstream --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$pr_number" ]; then
+            human_commits="$(gh pr view "$pr_number" --json commits --jq '[.commits[].authors[].login | select(. != "github-actions[bot]")] | length')"
+            if [ "$human_commits" != "0" ]; then
+              echo "ok: PR #$pr_number on sync/upstream carries human commits; reporting only"
+              cat "$report"
+              exit 0
+            fi
+            echo "stale bot-owned PR #$pr_number on sync/upstream; refreshing"
           fi
 
           set +e
@@ -117,24 +125,33 @@ jobs:
           git checkout -B sync/upstream
           git add -A
           git commit -m "chore(sync): upstream pstack/cursor-team-kit"
-          git push -u origin sync/upstream
+          if [ -n "$pr_number" ]; then
+            # Rewriting a bot-owned branch; the lease pins the just-fetched tip
+            # so a push that raced this run still fails instead of clobbering.
+            git fetch origin sync/upstream
+            git push --force-with-lease origin sync/upstream
+          else
+            git push -u origin sync/upstream
+          fi
 
-          if [ "$(gh pr list --head sync/upstream --state open --json number --jq 'length')" = "0" ]; then
-            body="$(mktemp)"
-            {
-              printf '%s\n\n' "Automated upstream sync."
-              cat "$report"
-            } > "$body"
+          body="$(mktemp)"
+          {
+            printf '%s\n\n' "Automated upstream sync."
+            cat "$report"
+          } > "$body"
+          if [ -n "$pr_number" ]; then
+            gh pr edit "$pr_number" --body-file "$body"
+          else
             set +e
             gh pr create --base "$DEFAULT_BRANCH" --head sync/upstream --title "chore(sync): upstream pstack/cursor-team-kit" --body-file "$body"
             pr_code=$?
             set -e
-            rm -f "$body"
             if [ "$pr_code" -ne 0 ]; then
               echo "pr create failed; branch remains sync/upstream"
               all_ok=0
             fi
           fi
+          rm -f "$body"
 
           verify_ok=1
           set +e
