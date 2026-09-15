@@ -2,6 +2,10 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.20 — add DeepSeek Flash to the default panel
+
+Port-specific catalog change. Upstream skill workflows are unchanged. `plugins/pstack/models.json` adds `deepseek-flash` as a fourth default panel seat for `how critics`, `arena runners`, `arena cross-judge pool`, `architect runners`, and `interrogate reviewers`. Single-role defaults stay on `gpt-6-astra` and `gpt-5.6-luna`. The available-model row is label and slug only. The generator iterates the panel instead of unpacking three seats. Adapter prose names only remaps that exist. `grok-4.6` still becomes `xai/grok-4.6` on Codex, GPT slugs still become `ocx-*` on Grok, and DeepSeek is not remapped. Stray-slug scanning covers `deepseek-*` and does not allow `ocx-deepseek-*`.
+
 ## 0.9.19 — default judgment roles to Astra
 
 `plugins/pstack/models.json` moves the single-role default and the first panel seat from `gpt-5.6-sol` to `gpt-6-astra`. Exploration and volume roles stay on `gpt-5.6-luna`. The three-model panel is `gpt-6-astra`, `gpt-5.6-luna`, `grok-4.6`. Sol remains in the available-model list for `/setup-pstack` overrides. The Grok runtime adapter now derives `ocx-*` spawn ids from the canonical slug (`gpt-6-astra` → `ocx-gpt-6-astra`) instead of hardcoding Sol. Stray-slug scanning covers `gpt-6*` as well as `gpt-5*`.

@@ -85,7 +85,7 @@ This port ships one `skills/` tree for Codex and Prime. Nothing is forked; the o
 - **Tool, model, and built-in mapping.** When a skill names a Claude tool (the `Agent` tool, `AskUserQuestion`) or a Claude built-in skill (`run`, `verify`, `loop`, `plugin-dev:skill-development`), it resolves through [`skills/poteto-mode/references/codex-tools.md`](plugins/pstack/skills/poteto-mode/references/codex-tools.md). Model slugs are the Codex+Grok catalog; the same file holds the Grok runtime adapter. `poteto-mode` and every skill that names one of those carries a one-line **Platform note** pointing there.
 - **Subagents.** The `Agent` tool maps to Codex `spawn_agent` / `wait_agent` / `close_agent`, enabled by `multi_agent = true`. Parallel fan-out is multiple `spawn_agent` calls in one turn. Without the flag, `interrogate`, `arena`, `how`, `why`, `reflect`, and `architect` degrade to a single sequential pass. Codex pstack roles use the `default` agent type with explicit model and effort values. Put the semantic role in `task_name` and the prompt. The full request shape lives in [`codex-tools.md`](plugins/pstack/skills/poteto-mode/references/codex-tools.md).
 - **Auto-fire.** Codex has no plugin hook runtime. Enter `pstack:poteto-mode` by name, or add a standing instruction to `~/.codex/AGENTS.md` if you want the same always-on routing.
-- **Models.** Role defaults are the Codex+Grok catalog, stamped into each skill's Models section from `plugins/pstack/models.json`. The default panel is `gpt-6-astra`, `gpt-5.6-luna`, `grok-4.6`. `/setup-pstack` writes `~/.codex/pstack-models.md` (referenced from `~/.codex/AGENTS.md`).
+- **Models.** Role defaults are the Codex+Grok catalog, stamped into each skill's Models section from `plugins/pstack/models.json`. The default panel is `gpt-6-astra`, `gpt-5.6-luna`, `grok-4.6`, `deepseek-flash`. `/setup-pstack` writes `~/.codex/pstack-models.md` (referenced from `~/.codex/AGENTS.md`).
 
 Verified on a live Codex session installed via the symlinks: the user-facing skills are discovered and namespaced under `pstack` (`pstack:poteto-mode`, `pstack:interrogate`, and so on). The `principle-*` leaf skills carry `user-invocable: false` and no command, so Codex does not surface them in the picker, the same as Claude Code. They stay installed for `poteto-mode` to read by path. The deeper behaviors (mapping resolution mid-task, `spawn_agent` fan-out) follow the proven `superpowers` pattern and are worth confirming in your own session.
 
@@ -193,11 +193,11 @@ The port is editorial, not mechanical. Anywhere upstream pstack assumed Cursor-s
 | Model `composer-2.5-fast` (Cursor) | `claude-sonnet-4-6` |
 | Model `claude-opus-4-X-thinking-xhigh` (Cursor UI variant) | `claude-opus-5` (extended thinking configured separately) |
 | Models `gpt-5.3-codex-high-fast`, `gpt-5.5-high-fast` (via Cursor) | `claude-sonnet-4-6`, `claude-haiku-4-5` (Claude family) |
-| Multi-model panels (arena, architect, interrogate, how-critics) | Default panel is `gpt-6-astra` + `gpt-5.6-luna` + `grok-4.6`. Claude Code can restore the sidecar panel via `/setup-pstack`. |
+| Multi-model panels (arena, architect, interrogate, how-critics) | Default panel is `gpt-6-astra` + `gpt-5.6-luna` + `grok-4.6` + `deepseek-flash`. Claude Code can restore the sidecar panel via `/setup-pstack`. |
 
 ### What's lost in translation
 
-**Cross-vendor model diversity on Claude Code.** Default panels mix Codex and Grok. Claude Code can restore the single-vendor sidecar catalog via `/setup-pstack`; that case still routes the harsher pass to the bundled `thermo-nuclear-code-quality-review` skill — a maintainability rubric, not vendor diversity, and it lives in-plugin with no extra installs.
+**Cross-vendor model diversity on Claude Code.** Default panels mix Codex, Grok, and DeepSeek. Claude Code can restore the single-vendor sidecar catalog via `/setup-pstack`; that case still routes the harsher pass to the bundled `thermo-nuclear-code-quality-review` skill — a maintainability rubric, not vendor diversity, and it lives in-plugin with no extra installs.
 
 ### What's deliberately kept
 

@@ -184,16 +184,52 @@ function ocxSlug(canonical) {
   return `ocx-${canonical.replaceAll(".", "-")}`;
 }
 
+function availableBySlug(models) {
+  return new Map((models.available ?? []).map((row) => [row.slug, row]));
+}
+
+function remapSpawn(slug, runtime, row) {
+  const stored = row?.spawn?.[runtime];
+  if (stored && stored !== slug) return stored;
+  if (runtime === "grok" && slug.startsWith("gpt-")) return ocxSlug(slug);
+  return undefined;
+}
+
+function panelRemaps(models, runtime) {
+  const catalog = availableBySlug(models);
+  const remaps = [];
+  for (const slug of models.panel) {
+    const spawn = remapSpawn(slug, runtime, catalog.get(slug));
+    if (spawn && spawn !== slug) remaps.push({ slug, spawn });
+  }
+  return remaps;
+}
+
+function remapClause({ slug, spawn }, extra = "") {
+  return `${code(slug)} becomes ${code(spawn)}${extra}`;
+}
+
 export function codexModelNamesSection(models) {
-  const [lead, luna, grok] = models.panel;
+  const codexRemaps = panelRemaps(models, "codex").map((remap) =>
+    remapClause(
+      remap,
+      remap.spawn.startsWith("xai/")
+        ? " when the OpenCodex Grok override is active, otherwise skip that panel seat or pick another available family"
+        : "",
+    ),
+  );
+  const grokRemaps = panelRemaps(models, "grok").map((remap) => remapClause(remap));
+  const adapter = [
+    ...(codexRemaps.length ? [`- Codex: ${codexRemaps.join("; ")}.`] : []),
+    ...(grokRemaps.length ? [`- Grok: ${grokRemaps.join("; ")}.`] : []),
+  ].join("\n");
   return (
     "Skills name Codex+Grok defaults (a single-role default for code/prose/judgment plus a diverse-model panel; " +
     "each model-consuming skill lists its own in a Models section). On Codex they work as written. On Grok, map through the runtime adapter below.\n\n" +
     `- Single-model roles: judgment, implementation, and synthesis use ${code(models.singleRoleDefault)}; exploration and volume work use the explorer/worker roles stamped per skill.\n` +
     `- Diverse-model panels (\`arena\`, \`architect\`, \`interrogate\`, \`how\` critics): ${codeList(models.panel)}. If a runtime cannot reach a family, vary remaining models and note that diversity was reduced.\n\n` +
     "Runtime adapter (canonical slug to spawn id):\n\n" +
-    `- Codex: ${code(lead)} stays ${code(lead)}; ${code(luna)} stays ${code(luna)}; ${code(grok)} becomes ${code("xai/grok-4.6")} when the OpenCodex Grok override is active, otherwise skip that panel seat or pick another available family.\n` +
-    `- Grok: ${code(lead)} becomes ${code(ocxSlug(lead))}; ${code(luna)} becomes ${code(ocxSlug(luna))}; ${code(grok)} stays ${code(grok)}.\n\n` +
+    `${adapter}\n\n` +
     "`/setup-pstack` writes the configured model list."
   );
 }
@@ -202,7 +238,7 @@ export function codexModelNamesSection(models) {
 // generator-owned regions. The scan blanks each owned line range (keeping
 // line numbers stable) and reports whatever still matches.
 const SLUG_RE =
-  /\b(?:claude-(?:opus|fable|sonnet|haiku)[0-9a-z.-]*|gpt-(?:5|6)(?:\.\d+)?(?:-[a-z0-9]+)*|grok-4(?:\.\d+)?(?:-[a-z0-9]+)*|ocx-(?:gpt|xai|anthropic)[0-9a-z.-]*|xai\/grok-4(?:\.\d+)?)\b/;
+  /\b(?:claude-(?:opus|fable|sonnet|haiku)[0-9a-z.-]*|gpt-(?:5|6)(?:\.\d+)?(?:-[a-z0-9]+)*|grok-4(?:\.\d+)?(?:-[a-z0-9]+)*|deepseek-[0-9a-z.-]*|ocx-(?:gpt|xai|anthropic)[0-9a-z.-]*|xai\/grok-4(?:\.\d+)?)\b/;
 
 // [start, end) line ranges of every generator-owned region in this file.
 export function ownedRanges(lines) {
@@ -397,9 +433,11 @@ function main() {
   console.log("ok: .agents/plugins/marketplace.json names the plugin and points at a real path");
 }
 
-try {
-  main();
-} catch (err) {
-  console.error(`FAIL: ${err.message}`);
-  process.exit(1);
+if (import.meta.main) {
+  try {
+    main();
+  } catch (err) {
+    console.error(`FAIL: ${err.message}`);
+    process.exit(1);
+  }
 }
