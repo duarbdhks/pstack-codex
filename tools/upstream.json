@@ -4,7 +4,19 @@
     "pstack": {
       "upstreamPath": "pstack",
       "localPath": "plugins/pstack",
-      "sha": "4612556"
+      "sha": "4612556",
+      "exclude": [
+        { "pathPrefix": "automations/", "reason": "Cursor automations runtime; not ported" },
+        { "pathPrefix": "docs/guide/", "reason": "Cursor-hosted guide; the port documents itself in README.md" },
+        { "pathPrefix": ".cursor-plugin/", "reason": "Cursor plugin manifest; the port ships .codex-plugin, stamped by generate.mjs" },
+        { "pathPrefix": "commands/", "reason": "Cursor slash-command stubs; generate.mjs emits Codex prompt stubs instead" },
+        { "pathPrefix": "agents/", "reason": "Cursor agent definitions; the port dispatches via the Codex spawn contract" },
+        { "pathPrefix": "assets/", "reason": "logos and images; not ported" },
+        { "pathPrefix": "skills/make-bot-ui/", "reason": "Cursor card runtime; no Codex equivalent" },
+        { "pathPrefix": "README.md", "reason": "the port keeps its own README at the repo root" },
+        { "pathPrefix": ".gitignore", "reason": "the port keeps its own ignore rules" },
+        { "pathPrefix": "LICENSE", "reason": "upstream license already carried at the repo root" }
+      ]
     },
     "cursor-team-kit": {
       "upstreamPath": "cursor-team-kit/skills",

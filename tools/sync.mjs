@@ -3,12 +3,15 @@
 //
 //   bun tools/sync.mjs <component> <new-sha>     e.g. bun tools/sync.mjs pstack abc1234
 //
-// Reads tools/upstream.json (remote + per-component pin) and
+// Reads tools/upstream.json (remote + per-component pin + exclusions) and
 // tools/substitutions.json (mechanical Cursor->Claude rewrites plus a denylist
 // of Cursor-isms that need a human sentence, not a token swap). For each file
 // that changed upstream between the pinned SHA and the new one:
 //
+//   - path matches a component ExclusionRule prefix -> skipped, never written
 //   - local copy matches the substituted OLD upstream text -> clean update, written
+//   - SKILL.md whose local body matches the substituted OLD body -> clean update;
+//     the new body is written under a frontmatter merged per FRONTMATTER_POLICY
 //   - local copy is missing -> new file, written
 //   - local copy differs (port-specific edits) -> left alone, reported for manual merge
 //
@@ -50,6 +53,50 @@ export function denylistHits(path, text, denylist) {
   return hits;
 }
 
+export function splitMarkdown(text) {
+  const m = text.match(/^---\n([\s\S]*?\n)---\n/);
+  if (!m) return { frontmatter: null, body: text };
+  return { frontmatter: m[1], body: text.slice(m[0].length) };
+}
+
+// Who owns which SKILL.md frontmatter key when the sync writes a file. The
+// port owns its invocation surface, upstream owns identity, and Cursor-only
+// flags never land here because the Codex runtime has no reader for them.
+const FRONTMATTER_POLICY = {
+  portOwned: ["menu-description", "user-invocable"],
+  dropped: ["disable-model-invocation", "mode", "icon", "color", "reminder", "is_background"],
+};
+
+const isSkillFile = (rel) => rel.split("/").at(-1) === "SKILL.md";
+const isPrincipleLeaf = (rel) => /(^|\/)principle-[^/]+\/SKILL\.md$/.test(rel);
+
+// A block is one top-level key plus its continuation lines, so folded YAML
+// scalars survive the merge without a YAML parser.
+function frontmatterBlocks(fm) {
+  const blocks = [];
+  for (const line of fm.replace(/\n$/, "").split("\n")) {
+    const key = line.match(/^([A-Za-z0-9_-]+):/)?.[1];
+    if (key) blocks.push({ key, lines: [line] });
+    else if (blocks.length) blocks.at(-1).lines.push(line);
+  }
+  return blocks;
+}
+
+export function mergeFrontmatter({ upstream, local, rel }) {
+  const owned = new Set([...FRONTMATTER_POLICY.portOwned, ...FRONTMATTER_POLICY.dropped]);
+  const merged = frontmatterBlocks(upstream).filter((b) => !owned.has(b.key));
+  const localBlocks = new Map(frontmatterBlocks(local ?? "").map((b) => [b.key, b]));
+  for (const key of FRONTMATTER_POLICY.portOwned) {
+    if (localBlocks.has(key)) merged.push(localBlocks.get(key));
+  }
+  if (isPrincipleLeaf(rel)) {
+    const rest = merged.filter((b) => b.key !== "user-invocable");
+    rest.push({ key: "user-invocable", lines: ["user-invocable: false"] });
+    return rest.map((b) => b.lines.join("\n")).join("\n") + "\n";
+  }
+  return merged.map((b) => b.lines.join("\n")).join("\n") + "\n";
+}
+
 function listFiles(dir) {
   const out = [];
   for (const entry of readdirSync(dir)) {
@@ -62,39 +109,63 @@ function listFiles(dir) {
 }
 
 // Compare old-upstream vs new-upstream vs local for one component tree.
-// Returns { written, manual, unchanged, counts } and writes clean updates.
-export function syncComponent({ oldDir, newDir, localDir, rules, write }) {
-  const report = { written: [], manual: [], unchanged: 0, counts: new Map() };
+// Returns { written, manual, unchanged, excluded, counts } and writes clean
+// updates. `exclude` is the component's ExclusionRule list from upstream.json.
+export function syncComponent({ oldDir, newDir, localDir, rules, write, exclude = [] }) {
+  const report = { written: [], manual: [], unchanged: 0, excluded: 0, counts: new Map() };
   for (const newFile of listFiles(newDir)) {
     const rel = relative(newDir, newFile);
+    if (exclude.some((rule) => rel.startsWith(rule.pathPrefix))) {
+      report.excluded++;
+      continue;
+    }
     const localFile = join(localDir, rel);
     const oldFile = join(oldDir, rel);
     const newRaw = readFileSync(newFile);
     const isText = !rel.match(/\.(png|jpg|gif|lock)$/);
     const subNew = isText ? applySubstitutions(newRaw.toString("utf8"), rules) : null;
 
+    // The write target: substituted upstream text, with SKILL.md frontmatter
+    // rebuilt per FRONTMATTER_POLICY so port-owned keys survive the update.
+    const renderTarget = (localText) => {
+      if (!subNew) return newRaw;
+      if (!isSkillFile(rel)) return Buffer.from(subNew.text);
+      const newSplit = splitMarkdown(subNew.text);
+      if (newSplit.frontmatter === null) return Buffer.from(subNew.text);
+      const local = localText === null ? null : splitMarkdown(localText).frontmatter;
+      const fm = mergeFrontmatter({ upstream: newSplit.frontmatter, local, rel });
+      return Buffer.from(`---\n${fm}---\n${newSplit.body}`);
+    };
+
     if (!existsSync(localFile)) {
       if (write) {
         mkdirSync(dirname(localFile), { recursive: true });
-        writeFileSync(localFile, subNew ? subNew.text : newRaw);
+        writeFileSync(localFile, renderTarget(null));
       }
       report.written.push(`added: ${rel}`);
       subNew?.counts.forEach((n, p) => report.counts.set(p, (report.counts.get(p) ?? 0) + n));
       continue;
     }
     const local = readFileSync(localFile);
-    const newTarget = subNew ? Buffer.from(subNew.text) : newRaw;
+    const localText = isText ? local.toString("utf8") : null;
+    const newTarget = renderTarget(localText);
     if (local.equals(newTarget)) {
       report.unchanged++;
       continue;
     }
     // Did the port edit this file beyond the mechanical substitutions? Judge
     // against the substituted OLD upstream text; equality there means every
-    // local difference came from upstream drift, so the update is clean.
+    // local difference came from upstream drift, so the update is clean. For
+    // a SKILL.md, equal bodies are enough: the frontmatter diverges by design
+    // (FRONTMATTER_POLICY), so only body edits mark a file port-specific.
     let cleanBase = false;
     if (existsSync(oldFile) && isText) {
       const subOld = applySubstitutions(readFileSync(oldFile, "utf8"), rules);
-      cleanBase = local.toString("utf8") === subOld.text;
+      cleanBase = localText === subOld.text;
+      if (!cleanBase && isSkillFile(rel)) {
+        const localSplit = splitMarkdown(localText);
+        cleanBase = localSplit.frontmatter !== null && localSplit.body === splitMarkdown(subOld.text).body;
+      }
     }
     if (cleanBase) {
       if (write) writeFileSync(localFile, newTarget);
@@ -139,6 +210,7 @@ function main() {
       localDir: join(repo, spec.localPath),
       rules: substitutions,
       write: true,
+      exclude: spec.exclude ?? [],
     });
 
     const hits = report.written.flatMap((entry) => {
@@ -148,6 +220,7 @@ function main() {
     });
 
     console.log(`\nunchanged: ${report.unchanged} files`);
+    if (report.excluded) console.log(`excluded: ${report.excluded} files (upstream.json exclusions)`);
     for (const w of report.written) console.log(w);
     for (const [pattern, n] of report.counts) console.log(`substituted: "${pattern}" x${n}`);
     if (report.manual.length) {

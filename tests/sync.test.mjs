@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { applySubstitutions, denylistHits, syncComponent } from "../tools/sync.mjs";
@@ -69,6 +69,77 @@ describe("syncComponent", () => {
     expect(readFileSync(join(local, "skills/c/SKILL.md"), "utf8")).toBe("Brand new skill. AskUserQuestion early.\n");
     expect(readFileSync(join(local, "skills/b/SKILL.md"), "utf8")).toBe(
       "Old b body, plus a Platform note the port added.\n",
+    );
+  });
+
+  test("excluded prefixes are never written, even as new files", () => {
+    const newUp = tree({
+      "assets/logo.png": "png bytes\n",
+      "README.md": "upstream readme\n",
+      "skills/keep/SKILL.md": "---\nname: keep\ndescription: kept skill\n---\n\nKept body.\n",
+    });
+    const local = tree({});
+    const report = syncComponent({
+      oldDir: tree({}),
+      newDir: newUp,
+      localDir: local,
+      rules: RULES.substitutions,
+      write: true,
+      exclude: [
+        { pathPrefix: "assets/", reason: "not ported" },
+        { pathPrefix: "README.md", reason: "port-owned" },
+      ],
+    });
+    expect(report.excluded).toBe(2);
+    expect(report.written).toEqual(["added: skills/keep/SKILL.md"]);
+    expect(existsSync(join(local, "README.md"))).toBe(false);
+    expect(existsSync(join(local, "assets/logo.png"))).toBe(false);
+  });
+
+  test("body-only local drift is clean: new body lands under merged frontmatter", () => {
+    const oldUp = tree({
+      "skills/a/SKILL.md":
+        "---\nname: a\ndescription: old words\ndisable-model-invocation: true\nmode: true\nicon: crown\n---\n\nShared body. AskQuestion early.\n",
+    });
+    const newUp = tree({
+      "skills/a/SKILL.md":
+        "---\nname: a\ndescription: new words\ndisable-model-invocation: true\nmode: true\nicon: crown\ncolor: yellow\n---\n\nShared body. AskQuestion early. New paragraph.\n",
+    });
+    const local = tree({
+      "skills/a/SKILL.md":
+        "---\nname: a\ndescription: old words\nmenu-description: port menu line\n---\n\nShared body. AskUserQuestion early.\n",
+    });
+    const args = { oldDir: oldUp, newDir: newUp, localDir: local, rules: RULES.substitutions, write: true };
+
+    const report = syncComponent(args);
+
+    expect(report.manual).toEqual([]);
+    expect(report.written).toEqual(["updated: skills/a/SKILL.md"]);
+    expect(readFileSync(join(local, "skills/a/SKILL.md"), "utf8")).toBe(
+      "---\nname: a\ndescription: new words\nmenu-description: port menu line\n---\n\nShared body. AskUserQuestion early. New paragraph.\n",
+    );
+
+    const rerun = syncComponent(args);
+    expect(rerun.written).toEqual([]);
+    expect(rerun.unchanged).toBe(1);
+  });
+
+  test("a new principle leaf lands with user-invocable: false and no Cursor flags", () => {
+    const newUp = tree({
+      "skills/principle-x/SKILL.md":
+        "---\nname: principle-x\ndescription: a fresh principle\ndisable-model-invocation: true\n---\n\nPrinciple body.\n",
+    });
+    const local = tree({});
+    const report = syncComponent({
+      oldDir: tree({}),
+      newDir: newUp,
+      localDir: local,
+      rules: RULES.substitutions,
+      write: true,
+    });
+    expect(report.written).toEqual(["added: skills/principle-x/SKILL.md"]);
+    expect(readFileSync(join(local, "skills/principle-x/SKILL.md"), "utf8")).toBe(
+      "---\nname: principle-x\ndescription: a fresh principle\nuser-invocable: false\n---\n\nPrinciple body.\n",
     );
   });
 
