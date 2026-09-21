@@ -114,11 +114,17 @@ jobs:
           if [ -n "$remote_tip" ]; then
             remote_flag=1
             # checkout is depth 1. A shallow log would only see the tip author
-            # and could hide a human commit under it.
+            # and could hide a human commit under it. A bare branch name
+            # updates FETCH_HEAD only, and the author walk reads the
+            # remote-tracking refs.
             if [ -f .git/shallow ]; then
-              git fetch --unshallow origin "$DEFAULT_BRANCH" sync/upstream
+              git fetch --unshallow origin \
+                "+refs/heads/${DEFAULT_BRANCH}:refs/remotes/origin/${DEFAULT_BRANCH}" \
+                "+refs/heads/sync/upstream:refs/remotes/origin/sync/upstream"
             else
-              git fetch origin "$DEFAULT_BRANCH" sync/upstream
+              git fetch origin \
+                "+refs/heads/${DEFAULT_BRANCH}:refs/remotes/origin/${DEFAULT_BRANCH}" \
+                "+refs/heads/sync/upstream:refs/remotes/origin/sync/upstream"
             fi
             authors="$(git log --format='%an' "origin/${DEFAULT_BRANCH}..origin/sync/upstream")"
           fi
@@ -147,9 +153,9 @@ jobs:
           git add -A
           git commit -m "chore(sync): upstream pstack/cursor-team-kit"
           if [ "$push_action" = "force-with-lease" ]; then
-            # The lease pins the just-fetched tip so a push that raced this
-            # run still fails instead of clobbering.
-            git fetch origin sync/upstream
+            # The lease reads origin/sync/upstream. A bare branch name would
+            # update FETCH_HEAD only, so a raced push would not fail the lease.
+            git fetch origin "+refs/heads/sync/upstream:refs/remotes/origin/sync/upstream"
             git push --force-with-lease origin sync/upstream
           elif [ "$push_action" = "push" ]; then
             git push -u origin sync/upstream
