@@ -48,29 +48,35 @@ jobs:
 
           sync_one() {
             local component="$1"
-            local pin upstreamPath latest pin_full code out
+            local pin upstreamPath pin_tree head_tree head_sha pin_code head_code action code out
             pin="$(jq -r --arg c "$component" '.components[$c].sha' tools/upstream.json)"
             upstreamPath="$(jq -r --arg c "$component" '.components[$c].upstreamPath' tools/upstream.json)"
-            latest="$(git -C "$scratch" log -1 --format=%H HEAD -- "$upstreamPath")"
-            if [ -z "$latest" ]; then
+            set +e
+            pin_tree="$(git -C "$scratch" rev-parse "${pin}^{commit}:${upstreamPath}" 2>/dev/null)"
+            pin_code=$?
+            head_tree="$(git -C "$scratch" rev-parse "HEAD:${upstreamPath}" 2>/dev/null)"
+            head_code=$?
+            head_sha="$(git -C "$scratch" rev-parse HEAD)"
+            set -e
+            if [ "$pin_code" -ne 0 ] || [ "$head_code" -ne 0 ]; then
               all_ok=0
               {
                 printf '## %s\n' "$component"
-                printf 'failed: no HEAD commit for %s\n\n' "$upstreamPath"
+                printf 'failed: no tree for %s at pin or HEAD\n\n' "$upstreamPath"
               } >> "$report"
               return 0
             fi
-            pin_full="$(git -C "$scratch" rev-parse "${pin}^{commit}")"
-            if [ "$pin_full" = "$latest" ]; then
+            action="$(bun tools/sync-plan.mjs component "$pin_tree" "$head_tree")"
+            if [ "$action" = "skip" ]; then
               {
                 printf '## %s\n' "$component"
-                printf 'skipped: pin %s is current\n\n' "$pin_full"
+                printf 'skipped: pin tree %s is current\n\n' "$pin_tree"
               } >> "$report"
               return 0
             fi
             any_sync=1
             set +e
-            out="$(bun tools/sync.mjs "$component" "$latest" 2>&1)"
+            out="$(bun tools/sync.mjs "$component" "$head_sha" 2>&1)"
             code=$?
             set -e
             {
@@ -94,18 +100,33 @@ jobs:
             exit 0
           fi
 
-          # An open sync PR is stale once upstream moves again. Refresh it in
-          # place while every commit on the branch is ours; a human commit
-          # means someone is mid-review, so report and leave the branch alone.
+          # Refresh a bot-owned sync branch in place. A human commit means
+          # someone is mid-review, so report and leave the branch alone.
+          # That includes a closed PR whose branch is still on the remote.
           pr_number="$(gh pr list --head sync/upstream --state open --json number --jq '.[0].number // empty')"
+          remote_tip="$(git ls-remote origin refs/heads/sync/upstream | awk '{print $1}')"
+          open_flag=0
+          remote_flag=0
+          authors=""
           if [ -n "$pr_number" ]; then
-            human_commits="$(gh pr view "$pr_number" --json commits --jq '[.commits[].authors[].login | select(. != "github-actions[bot]")] | length')"
-            if [ "$human_commits" != "0" ]; then
-              echo "ok: PR #$pr_number on sync/upstream carries human commits; reporting only"
-              cat "$report"
-              exit 0
+            open_flag=1
+          fi
+          if [ -n "$remote_tip" ]; then
+            remote_flag=1
+            # checkout is depth 1. A shallow log would only see the tip author
+            # and could hide a human commit under it.
+            if [ -f .git/shallow ]; then
+              git fetch --unshallow origin "$DEFAULT_BRANCH" sync/upstream
+            else
+              git fetch origin "$DEFAULT_BRANCH" sync/upstream
             fi
-            echo "stale bot-owned PR #$pr_number on sync/upstream; refreshing"
+            authors="$(git log --format='%an' "origin/${DEFAULT_BRANCH}..origin/sync/upstream")"
+          fi
+          push_action="$(bun tools/sync-plan.mjs push "$(printf '%s\n%s\n%s\n' "$open_flag" "$remote_flag" "$authors")")"
+          if [ "$push_action" = "report-only" ]; then
+            echo "ok: sync/upstream has human commits; reporting only"
+            cat "$report"
+            exit 0
           fi
 
           set +e
@@ -125,13 +146,16 @@ jobs:
           git checkout -B sync/upstream
           git add -A
           git commit -m "chore(sync): upstream pstack/cursor-team-kit"
-          if [ -n "$pr_number" ]; then
-            # Rewriting a bot-owned branch; the lease pins the just-fetched tip
-            # so a push that raced this run still fails instead of clobbering.
+          if [ "$push_action" = "force-with-lease" ]; then
+            # The lease pins the just-fetched tip so a push that raced this
+            # run still fails instead of clobbering.
             git fetch origin sync/upstream
             git push --force-with-lease origin sync/upstream
-          else
+          elif [ "$push_action" = "push" ]; then
             git push -u origin sync/upstream
+          else
+            echo "unexpected push action: $push_action"
+            exit 1
           fi
 
           body="$(mktemp)"
