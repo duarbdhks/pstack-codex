@@ -53,16 +53,16 @@ judgment and prose: gpt-6-astra
 strongest judgment: gpt-6-astra
 how explorer: gpt-5.6-luna
 how explainer: gpt-6-astra
-how critics: gpt-6-astra, gpt-5.6-luna, grok-4.6, deepseek-flash
+how critics: gpt-6-astra, gpt-5.6-luna, grok-4.7, deepseek-flash
 why investigators: gpt-5.6-luna
 why synthesizer: gpt-6-astra
 reflect tooling: gpt-5.6-luna
 reflect judgment, divergent, synthesizer: gpt-6-astra
-arena runners: gpt-6-astra, gpt-5.6-luna, grok-4.6, deepseek-flash
-arena cross-judge pool: gpt-6-astra, gpt-5.6-luna, grok-4.6, deepseek-flash
+arena runners: gpt-6-astra, gpt-5.6-luna, grok-4.7, deepseek-flash
+arena cross-judge pool: gpt-6-astra, gpt-5.6-luna, grok-4.7, deepseek-flash
 swarm workers: gpt-5.6-luna
-architect runners: gpt-6-astra, gpt-5.6-luna, grok-4.6, deepseek-flash
-interrogate reviewers: gpt-6-astra, gpt-5.6-luna, grok-4.6, deepseek-flash
+architect runners: gpt-6-astra, gpt-5.6-luna, grok-4.7, deepseek-flash
+interrogate reviewers: gpt-6-astra, gpt-5.6-luna, grok-4.7, deepseek-flash
 ```
 
 ### 6. Wire it in
@@ -77,6 +77,6 @@ Tell the user where the override was written and how it loads (the `@` include i
 
 Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`).
 
-- Available models: GPT-6 Astra (`gpt-6-astra`), GPT-5.6 Sol (`gpt-5.6-sol`), GPT-5.6 Luna (`gpt-5.6-luna`), Grok 4.6 (`grok-4.6`), DeepSeek Flash (`deepseek-flash`), GPT-5.5 (`gpt-5.5`), GPT-5.4 (`gpt-5.4`)
-- Default panel: `gpt-6-astra`, `gpt-5.6-luna`, `grok-4.6`, `deepseek-flash`
+- Available models: GPT-6 Astra (`gpt-6-astra`), GPT-5.6 Sol (`gpt-5.6-sol`), GPT-5.6 Luna (`gpt-5.6-luna`), Grok 4.7 (`grok-4.7`), Grok 4.6 (`grok-4.6`), DeepSeek Flash (`deepseek-flash`), GPT-5.5 (`gpt-5.5`), GPT-5.4 (`gpt-5.4`)
+- Default panel: `gpt-6-astra`, `gpt-5.6-luna`, `grok-4.7`, `deepseek-flash`
 - Single-role default: `gpt-6-astra`

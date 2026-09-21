@@ -63,4 +63,4 @@ Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `too
 
 - how explorer: `gpt-5.6-luna`
 - how explainer: `gpt-6-astra`
-- how critics: `gpt-6-astra`, `gpt-5.6-luna`, `grok-4.6`, `deepseek-flash`
+- how critics: `gpt-6-astra`, `gpt-5.6-luna`, `grok-4.7`, `deepseek-flash`

@@ -12,8 +12,8 @@ describe("codexModelNamesSection", () => {
 
     const prose = codexModelNamesSection(models);
     expect(prose).toContain("`deepseek-flash`");
-    expect(prose).toContain("`gpt-6-astra`, `gpt-5.6-luna`, `grok-4.6`, `deepseek-flash`");
-    expect(prose).toContain("`grok-4.6` becomes `xai/grok-4.6`");
+    expect(prose).toContain("`gpt-6-astra`, `gpt-5.6-luna`, `grok-4.7`, `deepseek-flash`");
+    expect(prose).toContain("`grok-4.7` becomes `xai/grok-4.7`");
     expect(prose).toContain("`gpt-6-astra` becomes `ocx-gpt-6-astra`");
     expect(prose).toContain("`gpt-5.6-luna` becomes `ocx-gpt-5-6-luna`");
     expect(prose).not.toContain("ocx-deepseek-flash");

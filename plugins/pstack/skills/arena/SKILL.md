@@ -76,5 +76,5 @@ One synthesized artifact. One short synthesis note alongside, naming the base, t
 
 Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.codex/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
 
-- arena runners: `gpt-6-astra`, `gpt-5.6-luna`, `grok-4.6`, `deepseek-flash`
-- arena cross-judge pool: `gpt-6-astra`, `gpt-5.6-luna`, `grok-4.6`, `deepseek-flash`
+- arena runners: `gpt-6-astra`, `gpt-5.6-luna`, `grok-4.7`, `deepseek-flash`
+- arena cross-judge pool: `gpt-6-astra`, `gpt-5.6-luna`, `grok-4.7`, `deepseek-flash`

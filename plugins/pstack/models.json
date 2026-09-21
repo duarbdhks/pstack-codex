@@ -1,10 +1,11 @@
 {
   "singleRoleDefault": "gpt-6-astra",
-  "panel": ["gpt-6-astra", "gpt-5.6-luna", "grok-4.6", "deepseek-flash"],
+  "panel": ["gpt-6-astra", "gpt-5.6-luna", "grok-4.7", "deepseek-flash"],
   "available": [
     { "label": "GPT-6 Astra", "slug": "gpt-6-astra" },
     { "label": "GPT-5.6 Sol", "slug": "gpt-5.6-sol" },
     { "label": "GPT-5.6 Luna", "slug": "gpt-5.6-luna" },
+    { "label": "Grok 4.7", "slug": "grok-4.7", "spawn": { "codex": "xai/grok-4.7" } },
     { "label": "Grok 4.6", "slug": "grok-4.6", "spawn": { "codex": "xai/grok-4.6" } },
     { "label": "DeepSeek Flash", "slug": "deepseek-flash" },
     { "label": "GPT-5.5", "slug": "gpt-5.5" },
@@ -19,15 +20,15 @@
     { "role": "strongest judgment", "models": ["gpt-6-astra"], "skill": "poteto-mode" },
     { "role": "how explorer", "models": ["gpt-5.6-luna"], "skill": "how" },
     { "role": "how explainer", "models": ["gpt-6-astra"], "skill": "how" },
-    { "role": "how critics", "models": ["gpt-6-astra", "gpt-5.6-luna", "grok-4.6", "deepseek-flash"], "skill": "how" },
+    { "role": "how critics", "models": ["gpt-6-astra", "gpt-5.6-luna", "grok-4.7", "deepseek-flash"], "skill": "how" },
     { "role": "why investigators", "models": ["gpt-5.6-luna"], "skill": "why" },
     { "role": "why synthesizer", "models": ["gpt-6-astra"], "skill": "why" },
     { "role": "reflect tooling", "models": ["gpt-5.6-luna"], "skill": "reflect" },
     { "role": "reflect judgment, divergent, synthesizer", "models": ["gpt-6-astra"], "skill": "reflect" },
-    { "role": "arena runners", "models": ["gpt-6-astra", "gpt-5.6-luna", "grok-4.6", "deepseek-flash"], "skill": "arena" },
-    { "role": "arena cross-judge pool", "models": ["gpt-6-astra", "gpt-5.6-luna", "grok-4.6", "deepseek-flash"], "skill": "arena" },
+    { "role": "arena runners", "models": ["gpt-6-astra", "gpt-5.6-luna", "grok-4.7", "deepseek-flash"], "skill": "arena" },
+    { "role": "arena cross-judge pool", "models": ["gpt-6-astra", "gpt-5.6-luna", "grok-4.7", "deepseek-flash"], "skill": "arena" },
     { "role": "swarm workers", "models": ["gpt-5.6-luna"], "skill": "swarm" },
-    { "role": "architect runners", "models": ["gpt-6-astra", "gpt-5.6-luna", "grok-4.6", "deepseek-flash"], "skill": "architect" },
-    { "role": "interrogate reviewers", "models": ["gpt-6-astra", "gpt-5.6-luna", "grok-4.6", "deepseek-flash"], "skill": "interrogate" }
+    { "role": "architect runners", "models": ["gpt-6-astra", "gpt-5.6-luna", "grok-4.7", "deepseek-flash"], "skill": "architect" },
+    { "role": "interrogate reviewers", "models": ["gpt-6-astra", "gpt-5.6-luna", "grok-4.7", "deepseek-flash"], "skill": "interrogate" }
   ]
 }

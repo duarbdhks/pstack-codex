@@ -2,6 +2,10 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.22 — default panel Grok seat to grok-4.7
+
+Port-specific catalog change. Upstream skill workflows are unchanged. `plugins/pstack/models.json` moves the Grok seat on the default panel from `grok-4.6` to `grok-4.7` for `how critics`, `arena runners`, `arena cross-judge pool`, `architect runners`, and `interrogate reviewers`. Single-role defaults stay on `gpt-6-astra` and `gpt-5.6-luna`. The four-model panel is `gpt-6-astra`, `gpt-5.6-luna`, `grok-4.7`, `deepseek-flash`. Grok 4.6 remains in the available-model list for `/setup-pstack` overrides, with Codex spawn id `xai/grok-4.6`. The new seat's Codex spawn id is `xai/grok-4.7`. On Grok the canonical slug is the wire id. DeepSeek is still not remapped.
+
 ## 0.9.21 — sync to upstream pstack v0.15.2
 
 The pin advances from `4612556` (v0.14.2) to `5bf2b15` (v0.15.2), and the sync pipeline now enforces the port boundary in code. `tools/upstream.json` lists per-component exclusions (`automations/`, `docs/guide/`, `.cursor-plugin/`, `commands/`, `agents/`, `assets/`, `skills/make-bot-ui/`, `README.md`, `.gitignore`, `LICENSE`), so unported trees can never land through a sync. Every written `SKILL.md` passes through a frontmatter policy: the port keeps `menu-description` and `user-invocable`, upstream supplies `name` and `description`, `disable-model-invocation` and the sticky mode keys drop, and `principle-*` leaves are forced to `user-invocable: false`. A body that matches the substituted old upstream body counts as a clean update even when the frontmatter diverges, which auto-resolved the principle leaves that previously queued for manual merge. The scheduled workflow refreshes a stale bot-owned `sync/upstream` PR with `--force-with-lease` and a body update instead of skipping, and reports without touching the branch when a human commit is present.

@@ -41,7 +41,7 @@ Launch all reviewers in a single message using the `Agent` tool. Use the `interr
 |----------|---------------|
 | Reviewer A | `gpt-6-astra` |
 | Reviewer B | `gpt-5.6-luna` |
-| Reviewer C | `grok-4.6` |
+| Reviewer C | `grok-4.7` |
 | Reviewer D | `deepseek-flash` |
 
 For each reviewer:
