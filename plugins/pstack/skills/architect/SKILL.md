@@ -33,6 +33,7 @@ Skip Phase A only when the work is genuinely greenfield with no surrounding syst
 Run the **arena** skill with the design-sketch task and the Phase A grounding artifacts. Pass `references/runner-prompt.md` as each runner's prompt. Each candidate produces a design package shaped per `references/rationale-template.md`: the caller's usage written first, then the type sketch, function signatures, module map, and prose rationale derived from it.
 
 Use your configured architect runners (defaults in [Models](#models)).
+The Astra seat supplies the architect perspective; Sol and the external seat supply alternatives. The lead still chooses by the rubric.
 
 Design it twice. Require at least two structurally distinct candidates before synthesis, even when the first looks sufficient. This is the **exhaust-the-design-space** principle skill made concrete. Whole-shape alternatives, not point fixes inside one shape.
 
@@ -88,4 +89,4 @@ The caller's usage is written first and the type sketch derived from it. One fil
 
 Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.codex/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
 
-- architect runners: `gpt-6-astra`, `gpt-5.6-luna`, `grok-4.7`, `deepseek-flash`
+- architect runners: `gpt-6-astra`, `gpt-6-sol`, `grok-4.7`

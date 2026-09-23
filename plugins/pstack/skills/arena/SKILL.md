@@ -27,7 +27,8 @@ The N candidates will receive the same prompt, so the prompt is the contract. Ge
 
 1. State the artifact each candidate is producing.
 2. Derive the rubric. State what success looks like for *this* task, then turn it into 3-6 concrete gradeable criteria. Concrete: `Adds a --dry-run flag that skips writes`. Vague: `code is correct`. The rubric is the picker's tool in Phase D; candidates only see the task.
-3. Pick the runners. Use `arena runners` from `~/.claude/pstack-models.md` when present. Otherwise run one each on the defaults in [Models](#models). Spawn more when the arena covers multiple design directions. Same model N times when the work is generation-bound rather than judgment-sensitive.
+3. Pick the runners. Use `arena runners` from the runtime's `pstack-models.md` when present. Otherwise run one each on the defaults in [Models](#models). Spawn more when the arena covers multiple design directions. Same model N times when the work is generation-bound rather than judgment-sensitive.
+   On Codex, if the external seat is unavailable and only Sol remains, run two Sol candidates. Give each a different structural direction under the same task and rubric.
 4. Assign output paths. Each candidate writes to its own location (a git worktree where possible, otherwise `/tmp/arena-<slug>/candidate-<n>/`). N candidates writing to the same path is shared mutable state and fails the the **separate-before-serializing-shared-state** principle skill test.
 
 ## Phase B: Fan out
@@ -40,7 +41,7 @@ If a candidate fails to produce output, proceed with N-1 and note the dropout in
 
 ## Phase C: Cross-judge
 
-After all Phase B candidates complete, choose the judge model from the `arena cross-judge pool` in `~/.claude/pstack-models.md` when present, otherwise from the runner defaults above, preferring a different model family from the parent's. Spawn one readonly judge subagent on that model. It sees the rubric and the candidates by path label, scores each criterion, and recommends a base with rationale. It runs in parallel with the parent's reading in Phase D, not with the candidates themselves. Spawning while candidates are still writing means the judge sees partial or empty outputs and reports them as dropouts.
+After all Phase B candidates complete, choose the judge model from `arena cross-judge pool` in the runtime's `pstack-models.md` when present, otherwise from its default in [Models](#models). Spawn one readonly judge subagent on that model. It sees the rubric and the candidates by path label, scores each criterion, and recommends a base with rationale. It runs in parallel with the parent's reading in Phase D, not with the candidates themselves. Spawning while candidates are still writing means the judge sees partial or empty outputs and reports them as dropouts.
 
 ## Phase D: Pick a base
 
@@ -76,5 +77,5 @@ One synthesized artifact. One short synthesis note alongside, naming the base, t
 
 Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.codex/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
 
-- arena runners: `gpt-6-astra`, `gpt-5.6-luna`, `grok-4.7`, `deepseek-flash`
-- arena cross-judge pool: `gpt-6-astra`, `gpt-5.6-luna`, `grok-4.7`, `deepseek-flash`
+- arena runners: `gpt-6-sol`, `grok-4.7`
+- arena cross-judge pool: `gpt-6-astra`

@@ -78,15 +78,15 @@ Shared:
 
 ## Model names
 
-Skills name Codex+Grok defaults (a single-role default for code/prose/judgment plus a diverse-model panel; each model-consuming skill lists its own in a Models section). On Codex they work as written. On Grok, map through the runtime adapter below.
+Skills name Codex+Grok defaults (a single-role fallback for unlisted judgment plus a diverse-model panel; each model-consuming skill lists its own in a Models section). Resolve the Codex external seat and Grok remaps through the runtime adapter below.
 
-- Single-model roles: judgment, implementation, and synthesis use `gpt-6-astra`; exploration and volume work use the explorer/worker roles stamped per skill.
-- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics): `gpt-6-astra`, `gpt-5.6-luna`, `grok-4.7`, `deepseek-flash`. If a runtime cannot reach a family, vary remaining models and note that diversity was reduced.
+- Single-role fallback for unlisted judgment: `gpt-6-astra`. Named roles use their skill's Models section.
+- Default panel catalog: `gpt-6-astra`, `gpt-6-sol`, `grok-4.7`. `arena`, `architect`, and `interrogate` use the subsets in their Models sections.
 
 Runtime adapter (canonical slug to spawn id):
 
-- Codex: `grok-4.7` becomes `xai/grok-4.7` when the OpenCodex Grok override is active, otherwise skip that panel seat or pick another available family.
-- Grok: `gpt-6-astra` becomes `ocx-gpt-6-astra`; `gpt-5.6-luna` becomes `ocx-gpt-5-6-luna`.
+- Codex: `grok-4.7` is one external seat: read `ocx agent status --json` at `.injection`. When `multiAgentGuidanceEnabled` is true, use the active `xai/grok-4.7`, `xai/grok-4.7-build-fast`, or `deepseek/deepseek-flash` spawn id. Otherwise skip that panel seat.
+- Grok: `gpt-6-sol` becomes `ocx-gpt-6-sol`; `gpt-6-astra` becomes `ocx-gpt-6-astra`; `gpt-6-luna` becomes `ocx-gpt-6-luna`.
 
 `/setup-pstack` writes the configured model list.
 

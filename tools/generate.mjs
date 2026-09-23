@@ -195,10 +195,10 @@ function remapSpawn(slug, runtime, row) {
   return undefined;
 }
 
-function panelRemaps(models, runtime) {
+function modelRemaps(models, runtime, slugs = models.panel) {
   const catalog = availableBySlug(models);
   const remaps = [];
-  for (const slug of models.panel) {
+  for (const slug of slugs) {
     const spawn = remapSpawn(slug, runtime, catalog.get(slug));
     if (spawn && spawn !== slug) remaps.push({ slug, spawn });
   }
@@ -210,24 +210,24 @@ function remapClause({ slug, spawn }, extra = "") {
 }
 
 export function codexModelNamesSection(models) {
-  const codexRemaps = panelRemaps(models, "codex").map((remap) =>
-    remapClause(
-      remap,
-      remap.spawn.startsWith("xai/")
-        ? " when the OpenCodex Grok override is active, otherwise skip that panel seat or pick another available family"
-        : "",
-    ),
+  const catalog = availableBySlug(models);
+  const deepseekSpawn = `deepseek/${catalog.get("deepseek-flash").slug}`;
+  const codexRemaps = modelRemaps(models, "codex").map((remap) =>
+    remap.spawn.startsWith("xai/")
+      ? `${code(remap.slug)} is one external seat: read ${code("ocx agent status --json")} at ${code(".injection")}. When ${code("multiAgentGuidanceEnabled")} is true, use the active ${code(remap.spawn)}, ${code(`${remap.spawn}-build-fast`)}, or ${code(deepseekSpawn)} spawn id. Otherwise skip that panel seat`
+      : remapClause(remap),
   );
-  const grokRemaps = panelRemaps(models, "grok").map((remap) => remapClause(remap));
+  const roleSlugs = [...new Set(models.roles.flatMap((role) => role.models))];
+  const grokRemaps = modelRemaps(models, "grok", roleSlugs).map((remap) => remapClause(remap));
   const adapter = [
     ...(codexRemaps.length ? [`- Codex: ${codexRemaps.join("; ")}.`] : []),
     ...(grokRemaps.length ? [`- Grok: ${grokRemaps.join("; ")}.`] : []),
   ].join("\n");
   return (
-    "Skills name Codex+Grok defaults (a single-role default for code/prose/judgment plus a diverse-model panel; " +
-    "each model-consuming skill lists its own in a Models section). On Codex they work as written. On Grok, map through the runtime adapter below.\n\n" +
-    `- Single-model roles: judgment, implementation, and synthesis use ${code(models.singleRoleDefault)}; exploration and volume work use the explorer/worker roles stamped per skill.\n` +
-    `- Diverse-model panels (\`arena\`, \`architect\`, \`interrogate\`, \`how\` critics): ${codeList(models.panel)}. If a runtime cannot reach a family, vary remaining models and note that diversity was reduced.\n\n` +
+    "Skills name Codex+Grok defaults (a single-role fallback for unlisted judgment plus a diverse-model panel; " +
+    "each model-consuming skill lists its own in a Models section). Resolve the Codex external seat and Grok remaps through the runtime adapter below.\n\n" +
+    `- Single-role fallback for unlisted judgment: ${code(models.singleRoleDefault)}. Named roles use their skill's Models section.\n` +
+    `- Default panel catalog: ${codeList(models.panel)}. \`arena\`, \`architect\`, and \`interrogate\` use the subsets in their Models sections.\n\n` +
     "Runtime adapter (canonical slug to spawn id):\n\n" +
     `${adapter}\n\n` +
     "`/setup-pstack` writes the configured model list."

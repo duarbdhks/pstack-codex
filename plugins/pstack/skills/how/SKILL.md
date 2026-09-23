@@ -61,6 +61,5 @@ The explanation uses the sections defined in `references/explainer-prompt.md`, d
 
 Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.codex/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
 
-- how explorer: `gpt-5.6-luna`
+- how explorer: `gpt-6-luna`
 - how explainer: `gpt-6-astra`
-- how critics: `gpt-6-astra`, `gpt-5.6-luna`, `grok-4.7`, `deepseek-flash`

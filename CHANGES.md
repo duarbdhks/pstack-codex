@@ -2,6 +2,10 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.23 GPT-6 roles and one external panel seat
+
+The available Sol and Luna entries move to GPT-6. Code implementation roles default to Sol; exploration and volume roles default to Luna; judgment and synthesis remain on Astra. The default panel is Astra, Sol, and canonical Grok 4.7. Architect uses all three; Arena runs Sol and Grok with Astra as cross-judge; Interrogate reviews with Sol and Grok. The unused `how critics` role is removed. DeepSeek Flash remains in the catalog and can occupy the external seat when OpenCodex injects it, rather than running as a fourth simultaneous panel member. The Codex adapter reads the active model from `ocx agent status --json` at `.injection.model`; effort remains governed by the active `AGENTS.md` policy.
+
 ## 0.9.22 — default panel Grok seat to grok-4.7
 
 Port-specific catalog change. Upstream skill workflows are unchanged. `plugins/pstack/models.json` moves the Grok seat on the default panel from `grok-4.6` to `grok-4.7` for `how critics`, `arena runners`, `arena cross-judge pool`, `architect runners`, and `interrogate reviewers`. Single-role defaults stay on `gpt-6-astra` and `gpt-5.6-luna`. The four-model panel is `gpt-6-astra`, `gpt-5.6-luna`, `grok-4.7`, `deepseek-flash`. Grok 4.6 remains in the available-model list for `/setup-pstack` overrides, with Codex spawn id `xai/grok-4.6`. The new seat's Codex spawn id is `xai/grok-4.7`. On Grok the canonical slug is the wire id. DeepSeek is still not remapped.

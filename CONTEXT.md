@@ -4,8 +4,8 @@ Names for the concepts this repo's design discussions keep reaching for. Archite
 
 - **Build** — one of the runtimes the plugin ships to: the Codex build (`.codex-plugin/`) and the Prime path (`~/.agents/skills/` symlinks). Both share one `skills/` tree; each is an adapter over it.
 - **Model policy** — the mapping from roles to model slugs. Defaults live in `plugins/pstack/models.json` (Codex+Grok catalog at the top level) and are stamped into each skill's Models section; the user's override sheet (`~/.codex/pstack-models.md`, written by `setup-pstack`) is the layer that adapts them at runtime.
-- **Role** — a named unit of delegated work with its own model choice (`arena runners`, `how critics`, `swarm workers`). The role vocabulary lives in `models.json` and surfaces in `setup-pstack`'s sheet.
-- **Panel** — the diverse-model list the multi-model skills (`arena`, `architect`, `interrogate`, `how`) run by default. One fact in `models.json` (`panel`); the generator stamps every copy and fails on strays. The shipped panel mixes Codex, Grok, and DeepSeek.
+- **Role** — a named unit of delegated work with its own model choice (`arena runners`, `how explorer`, `swarm workers`). The role vocabulary lives in `models.json` and surfaces in `setup-pstack`'s sheet.
+- **Panel** — the diverse-model catalog for `arena`, `architect`, and `interrogate`; each skill selects its own subset from `models.json`. The generator stamps every copy and fails on strays. The shipped panel has Astra, Sol, and one external Grok seat, which can resolve to DeepSeek through OpenCodex.
 - **Prompt stub** (or trampoline) — a file under `.codex-plugin/prompts/` whose body invokes its skill. Codex-only, generated from the skill's `menu-description`.
 - **Menu description** — the `menu-description:` frontmatter one-liner every public skill carries. Renders as the Codex slash-menu text and the README command-table row; the long `description:` stays the trigger-matching prose.
 - **Generator** — `tools/generate.mjs`. Stamps facts from their single source into every committed copy and validates cross-file contracts. CI reruns it and fails on any diff.

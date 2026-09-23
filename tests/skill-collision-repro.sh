@@ -8,7 +8,7 @@
 # future upstream sync from reintroducing plugins/pstack/commands/.
 #
 # This also enforces the static maintenance invariants from CHANGES.md: the
-# principle-* leaf flags. (Version parity, the model quad, and prompt<->skill
+# principle-* leaf flags. (Version parity, model defaults, and prompt<->skill
 # correspondence are no longer checked here: tools/generate.mjs stamps each
 # from its source file and CI regenerates and diffs, so none can drift on a
 # green build.)
