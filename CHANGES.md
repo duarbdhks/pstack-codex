@@ -2,6 +2,14 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.24 — sync behavior from upstream pstack 0.15.5
+
+The pin moves from `5bf2b15` (v0.15.2) to `12d587d` (v0.15.5). `tools/sync.mjs` wrote the 15 files whose local body still matched the substituted old upstream text. Those are the prose cuts in `figure-it-out`, `technical-writing`, `tdd`, `unslop`, `blast-radius`, four principle leaves, the interrogate review references, `how`'s explorer prompt, and the append-safe header write in `show-me-your-work/scripts/log.sh`.
+
+Four port-edited files take the behavior and keep the Codex wording. `swarm` drops a verify or measure result that omits the brief's SHAs and method, reruns that worker once, and treats a second miss as a gap. `show-me-your-work` marks each run with a `start` row and corrects a bad row by appending a superseding row. `autopilot-full` verifies each code-ready round and each later patch push, and publishes an owner's own restack with `git push --force-with-lease`. The operator still clicks every merge. `autopilot-stack` uses that same round gate before a PR enters the Graphite stack, and rechecks mergeability after a restack even when `git patch-id` is unchanged.
+
+Upstream model defaults stay out. The port keeps the GPT-6 Astra, Sol, and Luna roles plus the single Grok 4.7 panel seat in `plugins/pstack/models.json`. Cursor cloud workers, `~/.cursor/rules/pstack-models.mdc`, the Origin forge, and `make-bot-ui` stay unported. The other manual-merge files differ only by those boundaries, so this release leaves them.
+
 ## 0.9.23 GPT-6 roles and one external panel seat
 
 The available Sol and Luna entries move to GPT-6. Code implementation roles default to Sol; exploration and volume roles default to Luna; judgment and synthesis remain on Astra. The default panel is Astra, Sol, and canonical Grok 4.7. Architect uses all three; Arena runs Sol and Grok with Astra as cross-judge; Interrogate reviews with Sol and Grok. The unused `how critics` role is removed. DeepSeek Flash remains in the catalog and can occupy the external seat when OpenCodex injects it, rather than running as a fourth simultaneous panel member. The Codex adapter reads the active model from `ocx agent status --json` at `.injection.model`; effort remains governed by the active `AGENTS.md` policy.
