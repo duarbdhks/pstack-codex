@@ -48,7 +48,8 @@ If a runtime rejects the translated type, stop. Do not silently substitute Codex
 On Codex:
 
 - Use the `default` Codex agent type for every pstack role. Do not translate semantic roles into Codex types such as `worker`, `reviewer`, or `explorer`. A specialized type can own its model and reasoning effort. Put the pstack role in `task_name` and the prompt instead.
-- Resolve `model` from `~/.codex/pstack-models.md`. Resolve `reasoning_effort` from the active `AGENTS.md` policy. Pass both fields explicitly. Do not dispatch until both values resolve.
+- Resolve both `model` and `effort` from the same selection in `~/.codex/pstack-models.md`, using `~/.codex/AGENTS.md` for fixed/OCX resolution. Pass them explicitly as `model` and `reasoning_effort`. This applies to both namespaced and standalone pstack skills.
+- Record the role, model and effort before each dispatch batch and compare the actual payload with that selection. If either override is missing, mismatched, unsupported, or cannot be expressed by the tool, stop before spawning. An omitted model inherits the parent; it does not select the role's configured model.
 - Set `fork_turns` to `"none"` by default. Use a positive bounded count only when the task needs recent history.
 - `spawn_agent` calls already run concurrently with your turn, so `run_in_background: true` has no separate flag. Issue the dispatch and continue.
 
@@ -72,7 +73,7 @@ Shared:
   "model": "<configured model>",
   "reasoning_effort": "<configured effort>",
   "fork_turns": "none",
-  "prompt": "<complete task, constraints, and file pointers>"
+  "message": "<complete task, constraints, and file pointers>"
 }
 ```
 

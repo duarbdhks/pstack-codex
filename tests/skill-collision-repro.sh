@@ -74,43 +74,47 @@ principle_leaves_hidden() {
 }
 
 codex_dispatch_uses_default_agent() {
-  local mapping violations
+  local mapping swarm violations
   mapping="$repo/plugins/pstack/skills/poteto-mode/references/codex-tools.md"
-  if [ ! -f "$mapping" ]; then
-    echo "$mapping (missing)"
-    return 0
-  fi
+  swarm="$repo/plugins/pstack/skills/swarm/SKILL.md"
 
   violations="$(bun -e '
-    const text = await Bun.file(process.argv[1]).text();
-    const match = text.match(/^## Codex spawn contract\n\n```json\n([\s\S]*?)\n```$/m);
-    if (!match) {
-      console.log("missing Codex spawn contract");
-      process.exit(0);
+    const checks = [
+      [process.argv[1], /^## Codex spawn contract\n\n```json\n([\s\S]*?)\n```$/m, "<semantic role>"],
+      [process.argv[2], /^### Codex dispatch preflight\n[\s\S]*?```json\n([\s\S]*?)\n```$/m, "swarm workers"],
+    ];
+    for (const [path, pattern, role] of checks) {
+      const file = Bun.file(path);
+      if (!await file.exists()) {
+        console.log(`${path} (missing)`);
+        continue;
+      }
+      const match = (await file.text()).match(pattern);
+      if (!match) {
+        console.log(`${path} (missing Codex spawn contract)`);
+        continue;
+      }
+      let contract;
+      try {
+        contract = JSON.parse(match[1]);
+      } catch {
+        console.log(`${path} (Codex spawn contract must be valid JSON)`);
+        continue;
+      }
+      const expected = {
+        agent_type: ["default", "agent_type must be default"],
+        task_name: [role, "task_name must carry the semantic role"],
+        model: ["<configured model>", "model must be explicit"],
+        reasoning_effort: ["<configured effort>", "reasoning_effort must be explicit"],
+        fork_turns: ["none", "fork_turns must be explicit"],
+        message: ["<complete task, constraints, and file pointers>", "message must carry the complete task"],
+      };
+      for (const [field, [value, message]] of Object.entries(expected)) {
+        if (contract[field] !== value) console.log(`${path} (${message})`);
+      }
     }
-    let contract;
-    try {
-      contract = JSON.parse(match[1]);
-    } catch {
-      console.log("Codex spawn contract must be valid JSON");
-      process.exit(0);
-    }
-    const expected = {
-      agent_type: ["default", "agent_type must be default"],
-      task_name: ["<semantic role>", "task_name must carry the semantic role"],
-      model: ["<configured model>", "model must be explicit"],
-      reasoning_effort: ["<configured effort>", "reasoning_effort must be explicit"],
-      fork_turns: ["none", "fork_turns must be explicit"],
-    };
-    for (const [field, [value, message]] of Object.entries(expected)) {
-      if (contract[field] !== value) console.log(message);
-    }
-  ' "$mapping")"
-  [ -z "$violations" ] ||
-    printf '%s\n' "$violations" |
-      while IFS= read -r violation; do
-        printf '%s (%s)\n' "$mapping" "$violation"
-      done
+  ' "$mapping" "$swarm")"
+  [ -z "$violations" ] || printf '%s\n' "$violations"
   return 0
 }
 
