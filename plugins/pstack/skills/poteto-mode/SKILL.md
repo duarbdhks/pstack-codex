@@ -146,9 +146,9 @@ A large or cross-cutting effort (a migration across many call sites, an ambitiou
 
 Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.codex/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
 
-- feature, refactoring: `gpt-6-sol`
-- bug-fix: `gpt-6-sol`
-- perf-issue: `gpt-6-sol`
-- hillclimb: `gpt-6-sol`
+- feature, refactoring: `gpt-6.1-sol`
+- bug-fix: `gpt-6.1-sol`
+- perf-issue: `gpt-6.1-sol`
+- hillclimb: `gpt-6.1-sol`
 - judgment and prose: `gpt-6-astra`
 - strongest judgment: `gpt-6-astra`

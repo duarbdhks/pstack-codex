@@ -77,5 +77,5 @@ One synthesized artifact. One short synthesis note alongside, naming the base, t
 
 Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.codex/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
 
-- arena runners: `gpt-6-sol`, `grok-4.7`
+- arena runners: `gpt-6.1-sol`, `grok-4.7`
 - arena cross-judge pool: `gpt-6-astra`

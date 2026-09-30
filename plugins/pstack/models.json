@@ -1,9 +1,10 @@
 {
   "singleRoleDefault": "gpt-6-astra",
-  "panel": ["gpt-6-astra", "gpt-6-sol", "grok-4.7"],
+  "panel": ["gpt-6-astra", "gpt-6.1-sol", "grok-4.7"],
   "available": [
     { "label": "GPT-6 Astra", "slug": "gpt-6-astra" },
-    { "label": "GPT-6 Sol", "slug": "gpt-6-sol" },
+    { "label": "GPT-6.1 Sol", "slug": "gpt-6.1-sol" },
+    { "label": "Claude Opus 5.5", "slug": "anthropic/claude-opus-5-5" },
     { "label": "GPT-6 Luna", "slug": "gpt-6-luna" },
     { "label": "Grok 4.7", "slug": "grok-4.7", "spawn": { "codex": "xai/grok-4.7" } },
     { "label": "Grok 4.6", "slug": "grok-4.6", "spawn": { "codex": "xai/grok-4.6" } },
@@ -12,10 +13,10 @@
     { "label": "GPT-5.4", "slug": "gpt-5.4" }
   ],
   "roles": [
-    { "role": "feature, refactoring", "models": ["gpt-6-sol"], "skill": "poteto-mode" },
-    { "role": "bug-fix", "models": ["gpt-6-sol"], "skill": "poteto-mode" },
-    { "role": "perf-issue", "models": ["gpt-6-sol"], "skill": "poteto-mode" },
-    { "role": "hillclimb", "models": ["gpt-6-sol"], "skill": "poteto-mode" },
+    { "role": "feature, refactoring", "models": ["gpt-6.1-sol"], "skill": "poteto-mode" },
+    { "role": "bug-fix", "models": ["gpt-6.1-sol"], "skill": "poteto-mode" },
+    { "role": "perf-issue", "models": ["gpt-6.1-sol"], "skill": "poteto-mode" },
+    { "role": "hillclimb", "models": ["gpt-6.1-sol"], "skill": "poteto-mode" },
     { "role": "judgment and prose", "models": ["gpt-6-astra"], "skill": "poteto-mode" },
     { "role": "strongest judgment", "models": ["gpt-6-astra"], "skill": "poteto-mode" },
     { "role": "how explorer", "models": ["gpt-6-luna"], "skill": "how" },
@@ -24,10 +25,10 @@
     { "role": "why synthesizer", "models": ["gpt-6-astra"], "skill": "why" },
     { "role": "reflect tooling", "models": ["gpt-6-luna"], "skill": "reflect" },
     { "role": "reflect judgment, divergent, synthesizer", "models": ["gpt-6-astra"], "skill": "reflect" },
-    { "role": "arena runners", "models": ["gpt-6-sol", "grok-4.7"], "skill": "arena" },
+    { "role": "arena runners", "models": ["gpt-6.1-sol", "grok-4.7"], "skill": "arena" },
     { "role": "arena cross-judge pool", "models": ["gpt-6-astra"], "skill": "arena" },
     { "role": "swarm workers", "models": ["gpt-6-luna"], "skill": "swarm" },
-    { "role": "architect runners", "models": ["gpt-6-astra", "gpt-6-sol", "grok-4.7"], "skill": "architect" },
-    { "role": "interrogate reviewers", "models": ["gpt-6-sol", "grok-4.7"], "skill": "interrogate" }
+    { "role": "architect runners", "models": ["gpt-6-astra", "gpt-6.1-sol", "grok-4.7"], "skill": "architect" },
+    { "role": "interrogate reviewers", "models": ["gpt-6.1-sol", "grok-4.7"], "skill": "interrogate" }
   ]
 }

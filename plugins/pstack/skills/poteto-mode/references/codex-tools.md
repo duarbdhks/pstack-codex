@@ -81,12 +81,12 @@ Shared:
 Skills name Codex+Grok defaults (a single-role fallback for unlisted judgment plus a diverse-model panel; each model-consuming skill lists its own in a Models section). Resolve the Codex external seat and Grok remaps through the runtime adapter below.
 
 - Single-role fallback for unlisted judgment: `gpt-6-astra`. Named roles use their skill's Models section.
-- Default panel catalog: `gpt-6-astra`, `gpt-6-sol`, `grok-4.7`. `arena`, `architect`, and `interrogate` use the subsets in their Models sections.
+- Default panel catalog: `gpt-6-astra`, `gpt-6.1-sol`, `grok-4.7`. `arena`, `architect`, and `interrogate` use the subsets in their Models sections.
 
 Runtime adapter (canonical slug to spawn id):
 
 - Codex: `grok-4.7` is one external seat: read `ocx agent status --json` at `.injection`. When `multiAgentGuidanceEnabled` is true, use the active `xai/grok-4.7`, `xai/grok-4.7-build-fast`, or `deepseek/deepseek-flash` spawn id. Otherwise skip that panel seat.
-- Grok: `gpt-6-sol` becomes `ocx-gpt-6-sol`; `gpt-6-astra` becomes `ocx-gpt-6-astra`; `gpt-6-luna` becomes `ocx-gpt-6-luna`.
+- Grok: `gpt-6.1-sol` becomes `ocx-gpt-6-1-sol`; `gpt-6-astra` becomes `ocx-gpt-6-astra`; `gpt-6-luna` becomes `ocx-gpt-6-luna`.
 
 `/setup-pstack` writes the configured model list.
 

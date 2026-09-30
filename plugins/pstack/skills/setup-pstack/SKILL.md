@@ -45,10 +45,10 @@ Write the override sheet (`~/.claude/pstack-models.md` on Claude Code, `~/.codex
 
 Per-role model overrides for pstack skills. Each pstack SKILL.md names its defaults in a Models section; the values here override those defaults. Delete a line to fall back to the skill default. A value of `inherit-parent` or `auto` runs that role on the parent session's model (the `Agent` call omits `model`); an alias entry in a panel list still counts toward that panel's fan-out.
 
-feature, refactoring: gpt-6-sol
-bug-fix: gpt-6-sol
-perf-issue: gpt-6-sol
-hillclimb: gpt-6-sol
+feature, refactoring: gpt-6.1-sol
+bug-fix: gpt-6.1-sol
+perf-issue: gpt-6.1-sol
+hillclimb: gpt-6.1-sol
 judgment and prose: gpt-6-astra
 strongest judgment: gpt-6-astra
 how explorer: gpt-6-luna
@@ -57,11 +57,11 @@ why investigators: gpt-6-luna
 why synthesizer: gpt-6-astra
 reflect tooling: gpt-6-luna
 reflect judgment, divergent, synthesizer: gpt-6-astra
-arena runners: gpt-6-sol, grok-4.7
+arena runners: gpt-6.1-sol, grok-4.7
 arena cross-judge pool: gpt-6-astra
 swarm workers: gpt-6-luna
-architect runners: gpt-6-astra, gpt-6-sol, grok-4.7
-interrogate reviewers: gpt-6-sol, grok-4.7
+architect runners: gpt-6-astra, gpt-6.1-sol, grok-4.7
+interrogate reviewers: gpt-6.1-sol, grok-4.7
 ```
 
 ### 6. Wire it in
@@ -76,6 +76,6 @@ Tell the user where the override was written and how it loads (the `@` include i
 
 Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`).
 
-- Available models: GPT-6 Astra (`gpt-6-astra`), GPT-6 Sol (`gpt-6-sol`), GPT-6 Luna (`gpt-6-luna`), Grok 4.7 (`grok-4.7`), Grok 4.6 (`grok-4.6`), DeepSeek Flash (`deepseek-flash`), GPT-5.5 (`gpt-5.5`), GPT-5.4 (`gpt-5.4`)
-- Default panel: `gpt-6-astra`, `gpt-6-sol`, `grok-4.7`
+- Available models: GPT-6 Astra (`gpt-6-astra`), GPT-6.1 Sol (`gpt-6.1-sol`), Claude Opus 5.5 (`anthropic/claude-opus-5-5`), GPT-6 Luna (`gpt-6-luna`), Grok 4.7 (`grok-4.7`), Grok 4.6 (`grok-4.6`), DeepSeek Flash (`deepseek-flash`), GPT-5.5 (`gpt-5.5`), GPT-5.4 (`gpt-5.4`)
+- Default panel: `gpt-6-astra`, `gpt-6.1-sol`, `grok-4.7`
 - Single-role default: `gpt-6-astra`
