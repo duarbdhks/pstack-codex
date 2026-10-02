@@ -29,16 +29,30 @@ describe("model policy", () => {
     expect(setupModelsSection(models)).toContain("Claude Opus 5.5 (`anthropic/claude-opus-5-5`)");
   });
 
-  test("resolves the canonical external seat from OpenCodex status", () => {
+  test("routes every Codex role and panel slot through the shared policy", () => {
     const prose = codexModelNamesSection(models);
-    expect(prose).toContain("`ocx agent status --json`");
-    expect(prose).toContain("`.injection`");
-    expect(prose).toContain("`multiAgentGuidanceEnabled`");
-    expect(prose).toContain("`xai/grok-4.7`, `xai/grok-4.7-build-fast`, or `deepseek/deepseek-flash`");
-    expect(prose).toContain("Otherwise skip that panel seat");
+    expect(prose).toContain("every role and panel slot");
+    expect(prose).toContain("`~/.codex/AGENTS.md`");
+    expect(prose).toContain("`~/.codex/pstack-models.md`");
+    expect(prose).toContain("model and effort unchanged");
+    expect(prose).toContain("Preserve all panel slots");
+    expect(prose).not.toContain("Otherwise skip that panel seat");
+    expect(prose).not.toContain("xai/grok-4.7-build-fast");
     expect(prose).toContain("`gpt-6.1-sol` becomes `ocx-gpt-6-1-sol`");
     expect(prose).toContain("`gpt-6-luna` becomes `ocx-gpt-6-luna`");
     expect(prose).not.toContain("ocx-deepseek-flash");
+  });
+
+  test("Codex setup preserves YAML selections instead of applying the Claude template", () => {
+    const skill = readFileSync(join(import.meta.dir, "../plugins/pstack/skills/setup-pstack/SKILL.md"), "utf8");
+    const codex = skill.split("## Codex\n")[1]?.split("## Claude Code\n")[0] ?? "";
+    expect(codex).toContain("`source: ocx`");
+    expect(codex).toContain("fallback");
+    expect(codex).toContain("role order");
+    expect(codex).toContain("panel slots");
+    expect(codex).toContain("`defaults.judgment`");
+    expect(codex).toContain("`defaults.evidence`");
+    expect(codex).toContain("Do not apply the Claude Code template below");
   });
 });
 

@@ -210,25 +210,18 @@ function remapClause({ slug, spawn }, extra = "") {
 }
 
 export function codexModelNamesSection(models) {
-  const catalog = availableBySlug(models);
-  const deepseekSpawn = `deepseek/${catalog.get("deepseek-flash").slug}`;
-  const codexRemaps = modelRemaps(models, "codex").map((remap) =>
-    remap.spawn.startsWith("xai/")
-      ? `${code(remap.slug)} is one external seat: read ${code("ocx agent status --json")} at ${code(".injection")}. When ${code("multiAgentGuidanceEnabled")} is true, use the active ${code(remap.spawn)}, ${code(`${remap.spawn}-build-fast`)}, or ${code(deepseekSpawn)} spawn id. Otherwise skip that panel seat`
-      : remapClause(remap),
-  );
   const roleSlugs = [...new Set(models.roles.flatMap((role) => role.models))];
   const grokRemaps = modelRemaps(models, "grok", roleSlugs).map((remap) => remapClause(remap));
   const adapter = [
-    ...(codexRemaps.length ? [`- Codex: ${codexRemaps.join("; ")}.`] : []),
+    "- Codex: resolve every role and panel slot through `~/.codex/AGENTS.md` and the YAML in `~/.codex/pstack-models.md`. Follow the active OpenCodex model and effort unchanged; when unavailable, use each selection's complete fallback pair. Preserve all panel slots, even when models repeat. The global policy owns availability checks and explicit user overrides.",
     ...(grokRemaps.length ? [`- Grok: ${grokRemaps.join("; ")}.`] : []),
   ].join("\n");
   return (
     "Skills name Codex+Grok defaults (a single-role fallback for unlisted judgment plus a diverse-model panel; " +
-    "each model-consuming skill lists its own in a Models section). Resolve the Codex external seat and Grok remaps through the runtime adapter below.\n\n" +
-    `- Single-role fallback for unlisted judgment: ${code(models.singleRoleDefault)}. Named roles use their skill's Models section.\n` +
+    "each model-consuming skill lists its own in a Models section). On Codex the global policy overrides these catalog defaults.\n\n" +
+    `- Catalog fallback for unlisted judgment: ${code(models.singleRoleDefault)}. Named defaults appear in each skill's Models section.\n` +
     `- Default panel catalog: ${codeList(models.panel)}. \`arena\`, \`architect\`, and \`interrogate\` use the subsets in their Models sections.\n\n` +
-    "Runtime adapter (canonical slug to spawn id):\n\n" +
+    "Runtime selection:\n\n" +
     `${adapter}\n\n` +
     "`/setup-pstack` writes the configured model list."
   );

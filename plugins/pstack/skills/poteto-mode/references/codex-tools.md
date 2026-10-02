@@ -1,6 +1,6 @@
 # Codex tool mapping for pstack
 
-pstack skills are written in Claude Code tool language (the `Skill` tool, the `Agent` tool, `AskUserQuestion`). Model slugs are the Codex+Grok catalog stamped from `models.json`. On Codex the skills are the same files; tool names resolve through this map, and model slugs work as written. On Claude Code, substitute the sidecar catalog via `/setup-pstack`. Read this when a pstack skill names a Claude tool, a Claude built-in skill, or a model slug.
+pstack skills are written in Claude Code tool language (the `Skill` tool, the `Agent` tool, `AskUserQuestion`). Model slugs are catalog defaults stamped from `models.json`. On Codex, tool names resolve through this map; model and effort resolve through `~/.codex/AGENTS.md` and `~/.codex/pstack-models.md`. On Claude Code, substitute the sidecar catalog via `/setup-pstack`. Read this when a pstack skill names a Claude tool, a Claude built-in skill, or a model slug.
 
 ## Tool actions
 
@@ -41,7 +41,7 @@ poteto-mode's Subagents section sets Claude-specific defaults (`subagent_type: "
 | `general-purpose` | `agent_type="default"` | `subagent_type="general-purpose"` |
 | `comment-sicko` | `agent_type="default"`; prompt reads `plugins/pstack/skills/no-comments/references/comment-sicko.md` in full first | `spawn_subagent` with `subagent_type="general-purpose"`; prompt reads that file in full first |
 
-`explore` / `explorer` are not pstack role carriers. Investigation roles stay on this map: Codex `default` plus the Luna row in `pstack-models.md`. Grok's built-in `explore` is read-only lookup, not a poteto implementation delegate.
+`explore` / `explorer` are not pstack role carriers. Investigation roles use Codex `default` plus the matching selection in `pstack-models.md`. Grok's built-in `explore` is read-only lookup, not a poteto implementation delegate.
 
 If a runtime rejects the translated type, stop. Do not silently substitute Codex `worker` or Grok `general-purpose`. Those skips drop the skill read and let the type own model or effort.
 
@@ -79,14 +79,14 @@ Shared:
 
 ## Model names
 
-Skills name Codex+Grok defaults (a single-role fallback for unlisted judgment plus a diverse-model panel; each model-consuming skill lists its own in a Models section). Resolve the Codex external seat and Grok remaps through the runtime adapter below.
+Skills name Codex+Grok defaults (a single-role fallback for unlisted judgment plus a diverse-model panel; each model-consuming skill lists its own in a Models section). On Codex the global policy overrides these catalog defaults.
 
-- Single-role fallback for unlisted judgment: `gpt-6-astra`. Named roles use their skill's Models section.
+- Catalog fallback for unlisted judgment: `gpt-6-astra`. Named defaults appear in each skill's Models section.
 - Default panel catalog: `gpt-6-astra`, `gpt-6.1-sol`, `grok-4.7`. `arena`, `architect`, and `interrogate` use the subsets in their Models sections.
 
-Runtime adapter (canonical slug to spawn id):
+Runtime selection:
 
-- Codex: `grok-4.7` is one external seat: read `ocx agent status --json` at `.injection`. When `multiAgentGuidanceEnabled` is true, use the active `xai/grok-4.7`, `xai/grok-4.7-build-fast`, or `deepseek/deepseek-flash` spawn id. Otherwise skip that panel seat.
+- Codex: resolve every role and panel slot through `~/.codex/AGENTS.md` and the YAML in `~/.codex/pstack-models.md`. Follow the active OpenCodex model and effort unchanged; when unavailable, use each selection's complete fallback pair. Preserve all panel slots, even when models repeat. The global policy owns availability checks and explicit user overrides.
 - Grok: `gpt-6.1-sol` becomes `ocx-gpt-6-1-sol`; `gpt-6-astra` becomes `ocx-gpt-6-astra`; `gpt-6-luna` becomes `ocx-gpt-6-luna`.
 
 `/setup-pstack` writes the configured model list.

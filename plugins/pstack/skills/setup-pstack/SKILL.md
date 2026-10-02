@@ -6,9 +6,21 @@ menu-description: configure pstack per-role model choices
 
 # Setup pstack
 
-Write a per-role model override sheet. On Claude Code that is `~/.claude/pstack-models.md`, included from `CLAUDE.md`. On Codex that is `~/.codex/pstack-models.md`, pasted into `~/.codex/AGENTS.md`. Each pstack skill names a default model inline; the override sheet is the layer that adapts those defaults to the models you actually have access to.
+Configure per-role model selections for the current runtime. Choose the matching section below.
 
-**Platform note.** Defaults are the Codex+Grok catalog stamped into the Models section. The override sheet is `~/.codex/pstack-models.md` on Codex (paste into `~/.codex/AGENTS.md`; Codex has no `@`-include) and `~/.claude/pstack-models.md` on Claude Code (include from `CLAUDE.md`). Role rows in step 5 are identical across runtimes; only the slugs, the file path, and the load mechanism change. On Claude Code, pick slugs from the sidecar catalog in Models. Detect reachable slugs from the current session, never write a slug you have not confirmed. See [`codex-tools.md`](../poteto-mode/references/codex-tools.md).
+## Codex
+
+1. Read `~/.codex/AGENTS.md` and the YAML in `~/.codex/pstack-models.md`. The global policy governs all roles, status checks, explicit user overrides and fallback. Use the active spawn contract to validate exact model IDs and effort pairs, not the catalog alone.
+2. Show the current selections and fallback pairs. Preserve `defaults`, role order, grouped role names and every array's purpose, order and panel slots. Resolve OCX once per batch using the global policy; describe fallback availability separately from whether OCX is currently usable.
+3. Apply requested changes in the same YAML block. Keep `source: ocx` with a complete `fallback: {model, effort}` for every default, role and panel slot unless the user explicitly chooses a fixed pair. When converting a fixed pair to OCX, preserve that pair as its fallback. A changed OCX model belongs in OpenCodex, not a hard-coded copy in this file; changing OpenCodex requires the user's request.
+4. Validate both fields of every fallback against the active spawn contract. If creating a missing sheet, include `defaults.judgment` and `defaults.evidence`, take role names and panel counts from the generated role list below, and confirm supported fallback pairs. Do not copy catalog aliases, guess effort or inherit the parent model. Reject incomplete or mixed fixed/OCX selections.
+5. Save only the requested role settings in `~/.codex/pstack-models.md`. Keep policy in `~/.codex/AGENTS.md`; do not paste or duplicate the YAML there. Report the changed selections and how they resolve.
+
+Do not apply the Claude Code template below on Codex. Model and effort are always explicit; `inherit-parent` and `auto` are not Codex selections.
+
+## Claude Code
+
+Write `~/.claude/pstack-models.md` and include it from `CLAUDE.md`. Pick reachable slugs from the sidecar catalog in Models. Each skill's defaults apply only when the override sheet has no matching role.
 
 Claude Code has no auto-applied "rules" mechanism like Cursor's `.mdc`. Inclusion is explicit: the user adds a line to `~/.claude/CLAUDE.md` (or their project `CLAUDE.md`) such as:
 
@@ -18,15 +30,15 @@ Claude Code has no auto-applied "rules" mechanism like Cursor's `.mdc`. Inclusio
 
 so the file is loaded as context for every session.
 
-## Steps
+### Steps
 
 ### 1. Detect available models
 
-Enumerate the model slugs you can pass to an `Agent` subagent in this session — that is the dependable source. The currently available models and the default panel are listed in [Models](#models) below; the panel is chosen for cross-family diversity. On Codex, the canonical Grok slug names one external seat: confirm its active spawn id with `ocx agent status --json` at `.injection.model` using the [`codex-tools.md`](../poteto-mode/references/codex-tools.md) adapter. On Claude Code, offer the sidecar catalog from that same section. Ask the user to confirm or paste any additional slugs they want available. Never write a real slug without confirming direct or external availability. The aliases `inherit-parent` and `auto` are always valid even though they are not detected slugs; both mean the role runs on the parent session's model, which the `Agent` call expresses by omitting `model`.
+Enumerate the model slugs you can pass to an `Agent` subagent in this session. Offer the sidecar catalog in [Models](#models) and ask the user to confirm additional slugs. Never write a real slug without confirming availability. On Claude Code, `inherit-parent` and `auto` mean omitting `model` in the `Agent` call.
 
 ### 2. Load current state
 
-The default role-to-model mapping is the rule shape shown in step 5 below. If the runtime's override sheet already exists (`~/.claude/pstack-models.md` or `~/.codex/pstack-models.md`), read it and treat its values as the current choices. Otherwise start from those defaults.
+The default role-to-model mapping is shown in step 5 below. If `~/.claude/pstack-models.md` exists, read it as the current choices. Otherwise start from those defaults.
 
 ### 3. Map and confirm
 
@@ -34,11 +46,11 @@ Show every role with its current model, marking any real slug without direct or 
 
 ### 4. Validate
 
-Every real slug written must be in the detected set, except the canonical Grok seat on Codex when its supported external spawn id is active; `inherit-parent` and `auto` always pass. If a chosen model is not available, stop and ask again. An override pointing at a model the user cannot use breaks every delegation that reads it.
+Every real slug written must be in the detected set; `inherit-parent` and `auto` always pass on Claude Code. If a chosen model is unavailable, ask for a supported choice.
 
 ### 5. Write the override sheet
 
-Write the override sheet (`~/.claude/pstack-models.md` on Claude Code, `~/.codex/pstack-models.md` on Codex) with the shape below. Overwrite the whole file so re-runs stay idempotent.
+Write `~/.claude/pstack-models.md` with the shape below. Overwrite the whole file so re-runs stay idempotent.
 
 ```markdown
 # pstack model configuration
@@ -66,11 +78,11 @@ interrogate reviewers: gpt-6.1-sol, grok-4.7
 
 ### 6. Wire it in
 
-On Claude Code, if `~/.claude/CLAUDE.md` does not already include `~/.claude/pstack-models.md`, append the `@~/.claude/pstack-models.md` line so it loads on every session. If the user prefers project scope, add the include to the project's `CLAUDE.md` instead. On Codex, paste the sheet into `~/.codex/AGENTS.md`.
+If `~/.claude/CLAUDE.md` does not already include `~/.claude/pstack-models.md`, append the `@~/.claude/pstack-models.md` line. If the user prefers project scope, add the include to the project's `CLAUDE.md` instead.
 
 ### 7. Confirm
 
-Tell the user where the override was written and how it loads (the `@` include in CLAUDE.md on Claude Code, or the AGENTS.md paste on Codex). Re-running this skill updates the override sheet.
+Tell the user where the override was written and which `CLAUDE.md` includes it. Re-running this skill updates the override sheet.
 
 ## Models
 
