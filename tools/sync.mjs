@@ -1,28 +1,8 @@
 #!/usr/bin/env bun
-// Sync this port forward to a new upstream SHA.
-//
-//   bun tools/sync.mjs <component> <new-sha>     e.g. bun tools/sync.mjs pstack abc1234
-//
-// Reads tools/upstream.json (remote + per-component pin + exclusions) and
-// tools/substitutions.json (mechanical Cursor->Claude rewrites plus a denylist
-// of Cursor-isms that need a human sentence, not a token swap). For each file
-// that changed upstream between the pinned SHA and the new one:
-//
-//   - path matches a component ExclusionRule prefix -> skipped, never written
-//   - local copy matches the substituted OLD upstream text -> clean update, written
-//   - SKILL.md whose local body matches the substituted OLD body -> clean update;
-//     the new body is written under a frontmatter merged per FRONTMATTER_POLICY
-//   - local copy is missing -> new file, written
-//   - local copy differs (port-specific edits) -> left alone, reported for manual merge
-//
-// Every written file is then denylist-scanned; a hit fails the run with file,
-// line, and the hint for that token, leaving the tree for inspection. The pin
-// in upstream.json is advanced only when the run succeeds. The printed report
-// (files written, per-rule substitution counts, manual-merge list) is the raw
-// material for the CHANGES.md entry.
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, constants, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -102,146 +82,217 @@ function listFiles(dir) {
   for (const entry of readdirSync(dir)) {
     if (entry === ".git" || entry === "node_modules") continue;
     const full = join(dir, entry);
-    if (statSync(full).isDirectory()) out.push(...listFiles(full));
+    const stat = lstatSync(full);
+    if (stat.isSymbolicLink()) throw new Error(`symlink is not a sync input: ${full}`);
+    if (stat.isDirectory()) out.push(...listFiles(full));
     else out.push(full);
   }
   return out;
 }
 
-// Compare old-upstream vs new-upstream vs local for one component tree.
-// Returns { written, manual, unchanged, excluded, counts } and writes clean
-// updates. `exclude` is the component's ExclusionRule list from upstream.json.
-export function syncComponent({ oldDir, newDir, localDir, rules, write, exclude = [] }) {
-  const report = { written: [], manual: [], unchanged: 0, excluded: 0, counts: new Map() };
-  for (const newFile of listFiles(newDir)) {
-    const rel = relative(newDir, newFile);
+export const contentRevision = (bytes) => bytes === null ? null : createHash("sha256").update(bytes).digest("hex");
+
+function localBytes(dir, rel) {
+  if (lstatSync(dir).isSymbolicLink()) throw new Error(`symlink is not a sync target: ${dir}`);
+  let current = dir;
+  for (const part of rel.split("/")) {
+    current = join(current, part);
+    if (lstatSync(current, { throwIfNoEntry: false })?.isSymbolicLink()) {
+      throw new Error(`symlink is not a sync target: ${current}`);
+    }
+  }
+  return existsSync(current) ? readFileSync(current) : null;
+}
+
+function renderTarget(raw, rel, local, rules) {
+  if (raw === null) return null;
+  if (/\.(png|jpg|jpeg|gif|webp|lock)$/.test(rel)) return raw;
+  const text = applySubstitutions(raw.toString("utf8"), rules).text;
+  if (!isSkillFile(rel)) return Buffer.from(text);
+  const upstream = splitMarkdown(text);
+  if (upstream.frontmatter === null) return Buffer.from(text);
+  const fm = mergeFrontmatter({ upstream: upstream.frontmatter, local: local === null ? null : splitMarkdown(local.toString("utf8")).frontmatter, rel });
+  return Buffer.from(`---\n${fm}---\n${upstream.body}`);
+}
+
+const sameBytes = (a, b) => a === null || b === null ? a === b : a.equals(b);
+
+export function syncComponent({ oldDir, newDir, localDir, rules, write = false, exclude = [], decisions = [], denylist = [] }) {
+  const report = { candidates: [], planned: [], written: [], manual: [], deferred: [], hits: [], unchanged: 0, excluded: 0, counts: new Map(), pinReady: false };
+  const reviewed = new Map();
+  for (const decision of decisions) {
+    if (reviewed.has(decision.path)) throw new Error(`duplicate review decision: ${decision.path}`);
+    reviewed.set(decision.path, decision);
+  }
+  const paths = new Set([...listFiles(oldDir).map((p) => relative(oldDir, p)), ...listFiles(newDir).map((p) => relative(newDir, p))]);
+  const operations = [];
+  for (const rel of [...paths].sort()) {
     if (exclude.some((rule) => rel.startsWith(rule.pathPrefix))) {
       report.excluded++;
       continue;
     }
-    const localFile = join(localDir, rel);
-    const oldFile = join(oldDir, rel);
-    const newRaw = readFileSync(newFile);
-    const isText = !rel.match(/\.(png|jpg|gif|lock)$/);
-    const subNew = isText ? applySubstitutions(newRaw.toString("utf8"), rules) : null;
-
-    // The write target: substituted upstream text, with SKILL.md frontmatter
-    // rebuilt per FRONTMATTER_POLICY so port-owned keys survive the update.
-    const renderTarget = (localText) => {
-      if (!subNew) return newRaw;
-      if (!isSkillFile(rel)) return Buffer.from(subNew.text);
-      const newSplit = splitMarkdown(subNew.text);
-      if (newSplit.frontmatter === null) return Buffer.from(subNew.text);
-      const local = localText === null ? null : splitMarkdown(localText).frontmatter;
-      const fm = mergeFrontmatter({ upstream: newSplit.frontmatter, local, rel });
-      return Buffer.from(`---\n${fm}---\n${newSplit.body}`);
-    };
-
-    if (!existsSync(localFile)) {
-      if (write) {
-        mkdirSync(dirname(localFile), { recursive: true });
-        writeFileSync(localFile, renderTarget(null));
-      }
-      report.written.push(`added: ${rel}`);
-      subNew?.counts.forEach((n, p) => report.counts.set(p, (report.counts.get(p) ?? 0) + n));
-      continue;
-    }
-    const local = readFileSync(localFile);
-    const localText = isText ? local.toString("utf8") : null;
-    const newTarget = renderTarget(localText);
-    if (local.equals(newTarget)) {
+    const oldRaw = existsSync(join(oldDir, rel)) ? readFileSync(join(oldDir, rel)) : null;
+    const newRaw = existsSync(join(newDir, rel)) ? readFileSync(join(newDir, rel)) : null;
+    if (sameBytes(oldRaw, newRaw)) {
       report.unchanged++;
       continue;
     }
-    // Did the port edit this file beyond the mechanical substitutions? Judge
-    // against the substituted OLD upstream text; equality there means every
-    // local difference came from upstream drift, so the update is clean. For
-    // a SKILL.md, equal bodies are enough: the frontmatter diverges by design
-    // (FRONTMATTER_POLICY), so only body edits mark a file port-specific.
-    let cleanBase = false;
-    if (existsSync(oldFile) && isText) {
-      const subOld = applySubstitutions(readFileSync(oldFile, "utf8"), rules);
-      cleanBase = localText === subOld.text;
-      if (!cleanBase && isSkillFile(rel)) {
-        const localSplit = splitMarkdown(localText);
-        cleanBase = localSplit.frontmatter !== null && localSplit.body === splitMarkdown(subOld.text).body;
-      }
-    }
-    if (cleanBase) {
-      if (write) writeFileSync(localFile, newTarget);
-      report.written.push(`updated: ${rel}`);
-      subNew?.counts.forEach((n, p) => report.counts.set(p, (report.counts.get(p) ?? 0) + n));
-    } else {
+    const localFile = join(localDir, rel);
+    const local = localBytes(localDir, rel);
+    const target = renderTarget(newRaw, rel, local, rules);
+    const base = renderTarget(oldRaw, rel, local, rules);
+    const clean = sameBytes(local, base);
+    const aligned = sameBytes(local, target);
+    const kind = oldRaw === null ? "added" : newRaw === null ? "deleted" : "updated";
+    const candidate = { path: rel, kind, revision: contentRevision(newRaw), localRevision: contentRevision(local), disposition: aligned ? "aligned" : clean ? "clean" : "local-edits", decision: null };
+    report.candidates.push(candidate);
+    const decision = reviewed.get(rel);
+    const valid = decision && decision.revision === candidate.revision && typeof decision.reason === "string" && decision.reason.trim() && ["adopt", "adapt", "exclude", "defer"].includes(decision.action);
+    if (!valid) {
       report.manual.push(rel);
+      continue;
+    }
+    candidate.decision = decision.action;
+    candidate.reason = decision.reason;
+    if (decision.action === "defer") {
+      report.deferred.push(rel);
+      continue;
+    }
+    if (decision.action === "adapt" || decision.action === "exclude") {
+      if (decision.localRevision !== candidate.localRevision) {
+        report.manual.push(rel);
+        continue;
+      }
+      if (decision.action === "adapt" && local !== null) report.hits.push(...denylistHits(rel, local.toString("utf8"), denylist));
+      continue;
+    }
+    if (!clean && !aligned) {
+      report.manual.push(rel);
+      continue;
+    }
+    if (target !== null) report.hits.push(...denylistHits(rel, target.toString("utf8"), denylist));
+    if (!aligned) {
+      report.planned.push(`${kind}: ${rel}`);
+      operations.push({ localFile, target, kind, rel, localRevision: candidate.localRevision });
+      if (newRaw !== null) applySubstitutions(newRaw.toString("utf8"), rules).counts.forEach((n, p) => report.counts.set(p, (report.counts.get(p) ?? 0) + n));
+    }
+  }
+  report.pinReady = report.manual.length === 0 && report.deferred.length === 0 && report.hits.length === 0;
+  if (write && report.pinReady) {
+    for (const operation of operations) {
+      if (contentRevision(localBytes(localDir, operation.rel)) !== operation.localRevision) throw new Error(`sync target changed after review: ${operation.rel}`);
+    }
+    for (const { localFile, target, kind, rel, localRevision } of operations) {
+      localBytes(localDir, rel);
+      if (target === null) rmSync(localFile);
+      else {
+        mkdirSync(dirname(localFile), { recursive: true });
+        const flags = constants.O_WRONLY | constants.O_CREAT | constants.O_NOFOLLOW | (localRevision === null ? constants.O_EXCL : constants.O_TRUNC);
+        const fd = openSync(localFile, flags);
+        try { writeFileSync(fd, target); } finally { closeSync(fd); }
+      }
+      report.written.push(`${kind}: ${rel}`);
     }
   }
   return report;
 }
 
 function git(args, opts = {}) {
-  return execFileSync("git", args, { encoding: "utf8", ...opts });
+  try { return execFileSync("git", args, { encoding: "utf8", ...opts }); }
+  catch (error) { throw new Error(`git ${args[0]} failed: ${String(error.stderr ?? error.message).slice(0, 1200)}`); }
 }
 
-function main() {
-  const [component, newSha] = process.argv.slice(2);
-  const upstreamPath = join(repo, "tools/upstream.json");
+export function parseSyncArgs(args) {
+  const [component, sha, ...flags] = args;
+  const options = { component, sha, apply: false, finalize: false, json: false, review: null, source: null };
+  for (let i = 0; i < flags.length; i++) {
+    const flag = flags[i];
+    if (flag === "--apply") options.apply = true;
+    else if (flag === "--finalize") { options.finalize = true; options.apply = true; }
+    else if (flag === "--json") options.json = true;
+    else if (flag === "--review" || flag === "--source") {
+      const value = flags[++i];
+      if (!value || value.startsWith("--")) throw new Error(`${flag} requires a path`);
+      options[flag.slice(2)] = value;
+    } else throw new Error(`unknown option: ${flag}`);
+  }
+  if (!component || !sha?.match(/^[0-9a-f]{7,40}$/)) throw new Error("usage: bun tools/sync.mjs <component> <sha> [--json] [--review path] [--apply|--finalize] [--source git-checkout]");
+  return options;
+}
+
+export function main(args = process.argv.slice(2), repository = repo) {
+  const options = parseSyncArgs(args);
+  const { component } = options;
+  const upstreamPath = join(repository, "tools/upstream.json");
   const upstream = JSON.parse(readFileSync(upstreamPath, "utf8"));
   const spec = upstream.components[component];
-  if (!spec || !newSha?.match(/^[0-9a-f]{7,40}$/)) {
-    console.error(`usage: bun tools/sync.mjs <${Object.keys(upstream.components).join("|")}> <new-sha>`);
-    process.exit(2);
-  }
-  const { substitutions, denylist } = JSON.parse(readFileSync(join(repo, "tools/substitutions.json"), "utf8"));
+  if (!spec) throw new Error(`unknown component: ${component}`);
+  const from = spec.sha;
+  const { substitutions, denylist } = JSON.parse(readFileSync(join(repository, "tools/substitutions.json"), "utf8"));
 
   const scratch = mkdtempSync(join(tmpdir(), "pstack-sync-"));
   try {
-    console.log(`cloning ${upstream.remote} ...`);
-    git(["clone", "--quiet", upstream.remote, join(scratch, "clone")]);
+    const clone = options.source ?? join(scratch, "clone");
+    if (!options.source) git(["clone", "--quiet", "--no-checkout", upstream.remote, clone]);
     const co = (sha, dest) => {
-      git(["-C", join(scratch, "clone"), "worktree", "add", "--detach", dest, sha]);
-      return join(dest, spec.upstreamPath);
+      mkdirSync(dest);
+      const archive = git(["-C", clone, "archive", "--format=tar", `${sha}:${spec.upstreamPath}`], { encoding: null, maxBuffer: 32 * 1024 * 1024 });
+      execFileSync("tar", ["-x", "-C", dest], { input: archive });
+      return dest;
     };
-    const oldDir = co(spec.sha, join(scratch, "old"));
+    const oldDir = co(from, join(scratch, "old"));
+    const newSha = git(["-C", clone, "rev-parse", `${options.sha}^{commit}`]).trim();
+    if (options.finalize && options.source) {
+      const registered = join(scratch, "registered");
+      git(["init", "--bare", "--quiet", registered]);
+      try { git(["-C", registered, "fetch", "--quiet", "--depth=1", upstream.remote, newSha]); }
+      catch (error) { throw new Error(`target cannot be verified against registered upstream: ${error.message}`); }
+    }
     const newDir = co(newSha, join(scratch, "new"));
+    let decisions = [];
+    let reviewMismatch = false;
+    const reviewPath = options.review ?? (spec.review ? join(repository, spec.review) : null);
+    if (reviewPath && existsSync(reviewPath)) {
+      const document = JSON.parse(readFileSync(reviewPath, "utf8"));
+      const review = document.components?.[component];
+      if (review?.from === from && review?.to === newSha) decisions = review.decisions;
+      else reviewMismatch = true;
+    }
 
     const report = syncComponent({
       oldDir,
       newDir,
-      localDir: join(repo, spec.localPath),
+      localDir: join(repository, spec.localPath),
       rules: substitutions,
-      write: true,
+      write: options.apply,
       exclude: spec.exclude ?? [],
+      decisions,
+      denylist,
     });
-
-    const hits = report.written.flatMap((entry) => {
-      const rel = entry.replace(/^(added|updated): /, "");
-      const path = join(spec.localPath, rel);
-      return denylistHits(path, readFileSync(join(repo, path), "utf8"), denylist);
-    });
-
-    console.log(`\nunchanged: ${report.unchanged} files`);
-    if (report.excluded) console.log(`excluded: ${report.excluded} files (upstream.json exclusions)`);
-    for (const w of report.written) console.log(w);
-    for (const [pattern, n] of report.counts) console.log(`substituted: "${pattern}" x${n}`);
-    if (report.manual.length) {
-      console.log(`\nneeds manual merge (port-specific edits meet upstream changes):`);
-      for (const m of report.manual) console.log(`  ${spec.localPath}/${m}`);
+    if (options.apply && reviewMismatch && report.candidates.length) throw new Error(`review revisions do not match ${component}: ${from} -> ${newSha}`);
+    let pinAdvanced = false;
+    if (options.finalize && report.pinReady && from !== newSha) {
+      for (const [command, commandArgs] of [["bun", ["tools/generate.mjs"]], ["bash", ["tests/skill-collision-repro.sh"]], ["bun", ["test", "tests/"]]]) {
+        execFileSync(command, commandArgs, { cwd: repository, stdio: ["ignore", "pipe", "pipe"] });
+      }
+      upstream.components[component].sha = newSha;
+      writeFileSync(upstreamPath, JSON.stringify(upstream, null, 2) + "\n");
+      pinAdvanced = true;
     }
-    if (hits.length) {
-      console.error(`\nFAIL: Cursor-isms in synced files; add a substitution or rewrite by hand, then rerun:`);
-      for (const h of hits) console.error(`  ${h}`);
-      process.exit(1);
+    const result = { component, from, to: newSha, status: report.pinReady ? "reviewed" : "needs-review", ...report, counts: Object.fromEntries(report.counts), pinAdvanced };
+    if (options.json) console.log(JSON.stringify(result, null, 2));
+    else {
+      console.log(`${component}: ${result.status}; ${report.candidates.length} upstream changes; pin ${pinAdvanced ? "advanced" : "held"}`);
+      for (const candidate of report.candidates) console.log(`${candidate.kind}: ${candidate.path} (${candidate.decision ?? "unreviewed"}, ${candidate.disposition})`);
+      for (const hit of report.hits) console.error(hit);
     }
-
-    upstream.components[component].sha = newSha;
-    writeFileSync(upstreamPath, JSON.stringify(upstream, null, 2) + "\n");
-    console.log(`\npinned: ${component} -> ${newSha}`);
-    console.log("next: review the diff, resolve the manual-merge list, write the CHANGES.md entry from this report, run bun tools/generate.mjs");
+    return { result, exitCode: report.hits.length ? 1 : options.apply && !report.pinReady ? 2 : 0 };
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  main();
+  try { process.exitCode = main().exitCode; }
+  catch (error) { console.error(`FAIL: ${error.message}`); process.exitCode = 1; }
 }

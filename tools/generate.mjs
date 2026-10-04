@@ -10,11 +10,11 @@
 //   each public skill's frontmatter (name + menu-description)
 //     -> its Codex prompt stub in plugins/pstack/.codex-plugin/prompts/
 //     -> its row in README.md's "Slash commands" table
-//   plugins/pstack/models.json (the model policy: role defaults, diverse panel,
-//   available slugs)
+//   plugins/pstack/models.json (catalog, role metadata, adaptive profiles)
 //     -> each model-consuming skill's "## Models" section
 //     -> setup-pstack's override-sheet block and interrogate's reviewer table
 //     -> the "## Model names" section of poteto-mode/references/codex-tools.md
+//     -> routing profile docs, legacy mappings, and scripts/models.generated.json
 //   No model slug may appear in skill prose outside stamped regions; the scan
 //   below fails on strays.
 //
@@ -25,6 +25,7 @@
 import { existsSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { routingFromCatalog } from "../plugins/pstack/skills/poteto-mode/scripts/route.mjs";
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -210,21 +211,42 @@ function remapClause({ slug, spawn }, extra = "") {
 }
 
 export function codexModelNamesSection(models) {
-  const roleSlugs = [...new Set(models.roles.flatMap((role) => role.models))];
-  const grokRemaps = modelRemaps(models, "grok", roleSlugs).map((remap) => remapClause(remap));
-  const adapter = [
-    "- Codex: resolve every role and panel slot through `~/.codex/AGENTS.md` and the YAML in `~/.codex/pstack-models.md`. Follow the active OpenCodex model and effort unchanged; when unavailable, use each selection's complete fallback pair. Preserve all panel slots, even when models repeat. The global policy owns availability checks and explicit user overrides.",
-    ...(grokRemaps.length ? [`- Grok: ${grokRemaps.join("; ")}.`] : []),
-  ].join("\n");
   return (
-    "Skills name Codex+Grok defaults (a single-role fallback for unlisted judgment plus a diverse-model panel; " +
-    "each model-consuming skill lists its own in a Models section). On Codex the global policy overrides these catalog defaults.\n\n" +
+    "Catalog defaults are stamped from `models.json`. The active spawn contract determines which exact model and effort pairs can run.\n\n" +
     `- Catalog fallback for unlisted judgment: ${code(models.singleRoleDefault)}. Named defaults appear in each skill's Models section.\n` +
     `- Default panel catalog: ${codeList(models.panel)}. \`arena\`, \`architect\`, and \`interrogate\` use the subsets in their Models sections.\n\n` +
     "Runtime selection:\n\n" +
-    `${adapter}\n\n` +
-    "`/setup-pstack` writes the configured model list."
+    "Resolve every role and panel slot through `~/.codex/AGENTS.md` and the YAML in `~/.codex/pstack-models.md`. " +
+    "Keep explicit fixed selections. OCX selections follow the injected model and effort unchanged, or use their complete fallback pair. " +
+    "Adaptive selections use the task profile only when the user has enabled that policy. Preserve all panel slots, even when models repeat. " +
+    "Use the executable resolver and receipt checks in [Codex routing](codex-routing.md). `auto` and `inherit-parent` are legacy aliases, not Codex selections."
   );
+}
+
+export function legacyModelNamesSection(models) {
+  const roleSlugs = [...new Set(models.roles.flatMap((role) => role.models))];
+  const remaps = modelRemaps(models, "grok", roleSlugs).map((remap) => remapClause(remap));
+  return `Legacy Grok mappings, stamped from \`models.json\`.\n\n${remaps.join(". ")}.`;
+}
+
+export function validateRoutingCatalog(models) {
+  for (const name of ["evidence", "implementation", "judgment"]) {
+    if (!models.codexRouting?.profiles?.[name]) throw new Error(`models.json: missing profile ${name}`);
+  }
+  routingFromCatalog(models);
+  const available = new Set(models.available.map((entry) => entry.slug));
+  for (const role of models.roles) {
+    if (role.kind !== undefined && role.kind !== "pool") throw new Error(`models.json: unsupported role kind for ${role.role}`);
+    if (!role.profile) throw new Error(`models.json: missing profile for ${role.role}`);
+    if (role.models.some((model) => !available.has(model))) throw new Error(`models.json: uncatalogued model in ${role.role}`);
+  }
+}
+
+export function dispatchProfilesSection(models) {
+  validateRoutingCatalog(models);
+  const rows = Object.entries(models.codexRouting.profiles).map(([name, pairs]) => `| ${name} | ${pairs.map((p) => `${code(p.model)} / ${code(p.effort)}`).join(" | ")} |`);
+  return "Generated from `models.json`. These are capability and effort tiers, not measured prices. The active spawn contract validates each pair.\n\n" +
+    "| Profile | Routine / low / shallow | Bounded / medium / standard | Complex / high / deep |\n| --- | --- | --- | --- |\n" + rows.join("\n");
 }
 
 // After stamping, no model slug may survive in skill prose outside the
@@ -236,7 +258,7 @@ const SLUG_RE =
 // [start, end) line ranges of every generator-owned region in this file.
 export function ownedRanges(lines) {
   const ranges = [];
-  const sectionStarts = ["## Models", "## Model names"];
+  const sectionStarts = ["## Models", "## Model names", "## Dispatch profiles"];
   for (const heading of sectionStarts) {
     const start = lines.indexOf(heading);
     if (start === -1) continue;
@@ -276,10 +298,10 @@ export function strayModelSlugs(path, text) {
 // this list fails here by name.
 const README_COMMAND_ORDER = [
   "poteto-mode", "how", "why", "architect", "arena", "interrogate",
-  "automate-me", "reflect", "tdd", "typescript-best-practices", "teach",
+  "automate-me", "reflect", "correct", "tdd", "typescript-best-practices", "teach",
   "swarm", "technical-writing", "bro", "figure-it-out", "show-me-your-work",
   "blast-radius", "recall", "setup-pstack", "unslop", "no-comments",
-  "create-verification-skill", "maintain-verification-skill", "deslop",
+  "create-verification-skill", "maintain-verification-skill", "benchmark-checklist", "deslop",
   "babysit", "thermo-nuclear-code-quality-review", "make-pr-easy-to-review",
   "fix-ci", "fix-merge-conflicts", "get-pr-comments", "what-did-i-get-done",
 ];
@@ -327,7 +349,15 @@ function main() {
   }
 
   const models = JSON.parse(readFileSync(join(repo, "plugins/pstack/models.json"), "utf8"));
+  validateRoutingCatalog(models);
   const skillsDir = join(repo, "plugins/pstack/skills");
+
+  const bundledCatalog = join(skillsDir, "poteto-mode/scripts/models.generated.json");
+  const catalogText = JSON.stringify(models, null, 2) + "\n";
+  if (!existsSync(bundledCatalog) || readFileSync(bundledCatalog, "utf8") !== catalogText) {
+    writeFileSync(bundledCatalog, catalogText);
+    console.log("stamped: bundled routing catalog");
+  }
 
   const bySkill = new Map();
   for (const r of models.roles) {
@@ -363,6 +393,14 @@ function main() {
     const text = readFileSync(path, "utf8");
     const next = replaceSection(text, "Model names", codexModelNamesSection(models), path);
     if (stampFile(path, next, "poteto-mode/references/codex-tools.md (models)")) modelStamps++;
+  }
+  for (const [relativePath, title, body] of [
+    ["poteto-mode/references/codex-routing.md", "Dispatch profiles", dispatchProfilesSection(models)],
+    ["poteto-mode/references/legacy-tools.md", "Model names", legacyModelNamesSection(models)],
+  ]) {
+    const path = join(skillsDir, relativePath);
+    const text = readFileSync(path, "utf8");
+    if (stampFile(path, replaceSection(text, title, body, path), `${relativePath} (models)`)) modelStamps++;
   }
   if (modelStamps === 0) console.log("ok: model-policy sections current");
 

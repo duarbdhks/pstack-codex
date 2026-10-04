@@ -11,6 +11,7 @@ Evals test how a change affects agent behavior before promoting it: a new skill 
 - No chain-eliciting cues. Don't ask the candidate to list which skills, principles, or files they applied; that meta-prompt inflates citation behavior. Ask for design notes generally and grade chain-following from code shape, not self-report.
 - Sanitize directory and slug names. Use project-shaped names a user might pick, not labels like `candidate-1` or `agent-a`.
 - Don't tell the candidate other candidates exist.
+- On Codex the child sees its `task_name` and `message`; sanitize both like any other visible name.
 - The judge can know it's judging but sees outputs by sanitized label only, never by model name.
 - Comparing two variants: one judge scores both sets in a single pass on one scale, blind to which set each came from. Two judge runs with different prompts don't compare, the calibration drifts.
 
@@ -21,7 +22,8 @@ Evals test how a change affects agent behavior before promoting it: a new skill 
 3. **Author one organic prompt.** What a user would type. No leakage of what's being measured.
 4. **Spawn N parallel candidates** on different models per the **arena** skill's Phase B. Each works in its own sanitized dir; same prompt to each.
 5. **Spawn one blinded judge** on a different model family per the **arena** skill's Phase C. Judge sees outputs by sanitized label and the rubric, never a model name.
-6. **Verify the chain from transcripts, not self-report.** Read each candidate's local transcript under Claude Code's per-project transcripts directory at `~/.claude/projects/<encoded-cwd>/` (one `*.jsonl` per session for this workspace). Do not glob across `~/.claude/projects/`; that crosses workspace boundaries and reads private chats from unrelated projects. Look at which files each candidate actually opened. Citing a principle is not reading its leaf skill, and reading it is not applying it. Grade chain-following from the files it really read plus the shape of the code, never from the candidate's own claims.
-7. **Read every candidate output yourself** end to end. Compare to the judge's verdict. Disagreement means a model is biased or the rubric is ambiguous. Synthesize.
+6. **Verify the chain from transcripts, not self-report.** On Codex, take each candidate's session id from its spawn result and read only that file, `~/.codex/sessions/<yyyy>/<mm>/<dd>/rollout-<timestamp>-<id>.jsonl`. Its last `turn_context` shows the model and effort that ran; its `response_item` tool calls show the commands it ran and the files it opened. Do not glob across sessions; that reads private chats from unrelated projects. (Claude Code transcripts: [`legacy-tools.md`](../references/legacy-tools.md).) Citing a principle is not reading its leaf skill, and reading it is not applying it. Grade chain-following from the files it really read plus the shape of the code, never from the candidate's own claims.
+7. **Keep static and behavior evidence apart.** Static metrics (diff size, files touched, files read, lint, typecheck and test results) and behavior metrics (rubric scores, what the delivered artifact does when driven) go in separate columns; never fold them into one score. State N per arm and the spread. With a handful of runs per arm, call a difference directional, not proven. A variant that wins only on static metrics has not won.
+8. **Read every candidate output yourself** end to end. Compare to the judge's verdict. Disagreement means a model is biased or the rubric is ambiguous. Synthesize.
 
-**Reply:** variant under test, rubric, per-candidate notes, judge's verdict, your synthesis, and a recommendation for whether to promote the variant.
+**Reply:** variant under test, rubric, per-candidate notes with the receipt pair that ran, static and behavior results side by side, judge's verdict, your synthesis, and a recommendation for whether to promote the variant.

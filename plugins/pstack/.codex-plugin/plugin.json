@@ -1,7 +1,7 @@
 {
   "name": "pstack",
-  "version": "0.9.24",
-  "description": "if you want to go fast, go deep first. pstack helps you write less, but higher quality code. rigorous agent workflows you can parallelize with confidence. Codex port of poteto's pstack; tool names resolve via skills/poteto-mode/references/codex-tools.md.",
+  "version": "0.10.0",
+  "description": "Codex engineering workflows with explicit model and effort routing, repeatable verification, and selective upstream improvements.",
   "author": {
     "name": "Lauren Tan"
   },
@@ -21,7 +21,7 @@
   "interface": {
     "displayName": "pstack",
     "shortDescription": "Rigorous, parallelizable agent workflows: go deep first, write less, verify everything",
-    "longDescription": "pstack guides agent work through poteto-mode's principles, parallel design exploration (architect/arena), adversarial multi-model review (interrogate), root-cause debugging, prose deslopping, and verified delivery. On Codex, tool names resolve via the codex-tools mapping.",
+    "longDescription": "pstack guides Codex work through shared principles, bounded parallel design and implementation, explicit paired model routing, and verification of real artifacts. Adaptive profiles are opt-in. Fixed and OCX settings remain compatible, and requested selections are checked against child receipts.",
     "developerName": "Lauren Tan (original), Michael Denyer (Codex port)",
     "category": "Developer Tools",
     "capabilities": [

@@ -1,0 +1,131 @@
+{
+  "baseline": "6304662",
+  "upstream": "e43c7ee26e0038c6c1fa8380dd34ce86ff94cb2a",
+  "method": {
+    "scenarios": 3,
+    "runsPerArm": 1,
+    "model": "anthropic/claude-opus-5-5",
+    "effort": "high",
+    "statisticalQualityClaim": false
+  },
+  "behavior": [
+    {
+      "scenario": "correct",
+      "arm": "before",
+      "agentId": "01a106cc-fef0-7c72-b408-ca4b7e8145b6",
+      "path": "/tmp/pstack-proofs-01a10687/ledger-cedar",
+      "result": {
+        "positiveExit": 0,
+        "pastMistakeExit": 1,
+        "restoredExit": 0,
+        "publicOutput": [
+          true,
+          true,
+          true,
+          false
+        ],
+        "headingUnchanged": true
+      }
+    },
+    {
+      "scenario": "correct",
+      "arm": "after",
+      "agentId": "01a106cc-ffba-72b3-b823-ba91ae2d0a52",
+      "path": "/tmp/pstack-proofs-01a10687/ledger-silver",
+      "result": {
+        "positiveExit": 0,
+        "pastMistakeExit": 1,
+        "restoredExit": 0,
+        "publicOutput": [
+          true,
+          true,
+          true,
+          false
+        ],
+        "headingUnchanged": true
+      }
+    },
+    {
+      "scenario": "measure",
+      "arm": "before",
+      "agentId": "01a106cd-00d6-74e0-a119-f894d804ac3a",
+      "path": "/tmp/pstack-proofs-01a10687/report-cedar",
+      "result": {
+        "verdict": "PR에 '변경판이 10배 빠르다'는 수치를 쓸 수 없음. 변경판 5회 측정이 모두 실패 응답이어서 같은 작업(1000행 성공 조회)을 비교한 결과가 아님."
+      }
+    },
+    {
+      "scenario": "measure",
+      "arm": "after",
+      "agentId": "01a106cd-01a8-7201-b3a0-35c77426d3fb",
+      "path": "/tmp/pstack-proofs-01a10687/report-silver",
+      "result": {
+        "verdict": "inconclusive: '변경판이 10배 빠르다'는 PR에 쓸 수 없습니다. 변경판 5회가 모두 실패 응답이라 같은 작업을 더 빨리 끝냈다는 근거가 없습니다."
+      }
+    },
+    {
+      "scenario": "design",
+      "arm": "before",
+      "agentId": "01a106cd-02b5-7922-80e6-c2224a33b2cc",
+      "path": "/tmp/pstack-proofs-01a10687/delivery-cedar",
+      "result": {
+        "result": "all described design issues addressed; forwarding layer rejected",
+        "difference": "internal imports described as a convention"
+      }
+    },
+    {
+      "scenario": "design",
+      "arm": "after",
+      "agentId": "01a106cd-036e-7ff2-883d-33dd30b2d0d5",
+      "path": "/tmp/pstack-proofs-01a10687/delivery-silver",
+      "result": {
+        "result": "all described design issues addressed; forwarding layer rejected",
+        "difference": "explicit build enforcement for internal imports"
+      }
+    }
+  ],
+  "native": {
+    "lookup": {
+      "agentId": "01a106cd-74e0-7631-b94b-d2e6385b50e3",
+      "status": "MATCH",
+      "requested": {
+        "model": "gpt-6-luna",
+        "effort": "medium"
+      },
+      "actual": {
+        "model": "gpt-6-luna",
+        "effort": "medium"
+      },
+      "transcript": "/Users/yeumgw/.codex/sessions/2026/10/04/rollout-2026-10-04T21-04-50-01a106cd-74e0-7631-b94b-d2e6385b50e3.jsonl",
+      "output": {
+        "states": [
+          "draft",
+          "sent",
+          "paid"
+        ],
+        "count": 3
+      }
+    },
+    "change": {
+      "status": "MATCH",
+      "requested": {
+        "model": "gpt-6.1-sol",
+        "effort": "medium"
+      },
+      "actual": {
+        "model": "gpt-6.1-sol",
+        "effort": "medium"
+      },
+      "transcript": "/Users/yeumgw/.codex/sessions/2026/10/04/rollout-2026-10-04T21-08-02-01a106d0-636f-7812-8f6a-9e9d17942133.jsonl",
+      "firstAttempt": {
+        "agentId": "01a106cd-75a4-7170-8baf-25ebeb7d80e1",
+        "status": "errored",
+        "reason": "provider 429; file was unchanged"
+      },
+      "output": {
+        "plain": "one\ntwo\n",
+        "json": "[\"one\",\"two\"]\n"
+      }
+    }
+  }
+}

@@ -12,23 +12,43 @@
     { "label": "GPT-5.5", "slug": "gpt-5.5" },
     { "label": "GPT-5.4", "slug": "gpt-5.4" }
   ],
+  "codexRouting": {
+    "version": 1,
+    "profiles": {
+      "evidence": [
+        { "model": "gpt-6-luna", "effort": "medium" },
+        { "model": "gpt-6-luna", "effort": "high" },
+        { "model": "gpt-6.1-sol", "effort": "high" }
+      ],
+      "implementation": [
+        { "model": "gpt-6.1-sol", "effort": "medium" },
+        { "model": "gpt-6.1-sol", "effort": "high" },
+        { "model": "gpt-6-astra", "effort": "high" }
+      ],
+      "judgment": [
+        { "model": "gpt-6.1-sol", "effort": "high" },
+        { "model": "gpt-6-astra", "effort": "high" },
+        { "model": "gpt-6-astra", "effort": "xhigh" }
+      ]
+    }
+  },
   "roles": [
-    { "role": "feature, refactoring", "models": ["gpt-6.1-sol"], "skill": "poteto-mode" },
-    { "role": "bug-fix", "models": ["gpt-6.1-sol"], "skill": "poteto-mode" },
-    { "role": "perf-issue", "models": ["gpt-6.1-sol"], "skill": "poteto-mode" },
-    { "role": "hillclimb", "models": ["gpt-6.1-sol"], "skill": "poteto-mode" },
-    { "role": "judgment and prose", "models": ["gpt-6-astra"], "skill": "poteto-mode" },
-    { "role": "strongest judgment", "models": ["gpt-6-astra"], "skill": "poteto-mode" },
-    { "role": "how explorer", "models": ["gpt-6-luna"], "skill": "how" },
-    { "role": "how explainer", "models": ["gpt-6-astra"], "skill": "how" },
-    { "role": "why investigators", "models": ["gpt-6-luna"], "skill": "why" },
-    { "role": "why synthesizer", "models": ["gpt-6-astra"], "skill": "why" },
-    { "role": "reflect tooling", "models": ["gpt-6-luna"], "skill": "reflect" },
-    { "role": "reflect judgment, divergent, synthesizer", "models": ["gpt-6-astra"], "skill": "reflect" },
-    { "role": "arena runners", "models": ["gpt-6.1-sol", "grok-4.7"], "skill": "arena" },
-    { "role": "arena cross-judge pool", "models": ["gpt-6-astra"], "skill": "arena" },
-    { "role": "swarm workers", "models": ["gpt-6-luna"], "skill": "swarm" },
-    { "role": "architect runners", "models": ["gpt-6-astra", "gpt-6.1-sol", "grok-4.7"], "skill": "architect" },
-    { "role": "interrogate reviewers", "models": ["gpt-6.1-sol", "grok-4.7"], "skill": "interrogate" }
+    { "role": "feature, refactoring", "models": ["gpt-6.1-sol"], "skill": "poteto-mode", "profile": "implementation" },
+    { "role": "bug-fix", "models": ["gpt-6.1-sol"], "skill": "poteto-mode", "profile": "implementation" },
+    { "role": "perf-issue", "models": ["gpt-6.1-sol"], "skill": "poteto-mode", "profile": "implementation" },
+    { "role": "hillclimb", "models": ["gpt-6.1-sol"], "skill": "poteto-mode", "profile": "implementation" },
+    { "role": "judgment and prose", "models": ["gpt-6-astra"], "skill": "poteto-mode", "profile": "judgment" },
+    { "role": "strongest judgment", "models": ["gpt-6-astra"], "skill": "poteto-mode", "profile": "judgment" },
+    { "role": "how explorer", "models": ["gpt-6-luna"], "skill": "how", "profile": "evidence" },
+    { "role": "how explainer", "models": ["gpt-6-astra"], "skill": "how", "profile": "judgment" },
+    { "role": "why investigators", "models": ["gpt-6-luna"], "skill": "why", "profile": "evidence" },
+    { "role": "why synthesizer", "models": ["gpt-6-astra"], "skill": "why", "profile": "judgment" },
+    { "role": "reflect tooling", "models": ["gpt-6-luna"], "skill": "reflect", "profile": "evidence" },
+    { "role": "reflect judgment, divergent, synthesizer", "models": ["gpt-6-astra"], "skill": "reflect", "profile": "judgment" },
+    { "role": "arena runners", "models": ["gpt-6.1-sol", "grok-4.7"], "skill": "arena", "profile": "implementation" },
+    { "role": "arena cross-judge pool", "models": ["gpt-6-astra"], "skill": "arena", "profile": "judgment", "kind": "pool" },
+    { "role": "swarm workers", "models": ["gpt-6-luna"], "skill": "swarm", "profile": "evidence" },
+    { "role": "architect runners", "models": ["gpt-6-astra", "gpt-6.1-sol", "grok-4.7"], "skill": "architect", "profile": "judgment" },
+    { "role": "interrogate reviewers", "models": ["gpt-6.1-sol", "grok-4.7"], "skill": "interrogate", "profile": "judgment" }
   ]
 }

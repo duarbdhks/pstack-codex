@@ -1,68 +1,48 @@
 # Codex tool mapping for pstack
 
-pstack skills are written in Claude Code tool language (the `Skill` tool, the `Agent` tool, `AskUserQuestion`). Model slugs are catalog defaults stamped from `models.json`. On Codex, tool names resolve through this map; model and effort resolve through `~/.codex/AGENTS.md` and `~/.codex/pstack-models.md`. On Claude Code, substitute the sidecar catalog via `/setup-pstack`. Read this when a pstack skill names a Claude tool, a Claude built-in skill, or a model slug.
+pstack skills keep upstream wording (`Skill`, `Agent`, `AskUserQuestion`) so workflows stay comparable with upstream. On Codex, resolve each action through this map. Model and effort resolve through [`codex-routing.md`](codex-routing.md). Claude Code and Grok specifics live in [`legacy-tools.md`](legacy-tools.md).
+
+## Capability discovery
+
+The tool list of the current turn is the only source of truth. Availability changes with Codex version, surface (CLI, app, cloud), mode (Plan or Default) and the user's config, so this file names candidates, not guarantees. Before a step depends on a tool, check that it is listed. When it is absent, use the fallback in the table and say which capability was missing. Never claim a capability from a config flag, a doc, or a previous session.
 
 ## Tool actions
 
-| pstack / Claude action | Codex equivalent |
-|------------------------|------------------|
-| Read a file | `shell` (`cat`, `head`, `tail`) |
-| Create / edit / delete a file | `apply_patch` |
-| Run a shell command | `shell` |
-| Search file contents / find files | `shell` (`rg`, `grep`, `find`, `ls`) |
-| Fetch a URL | `shell` with `curl` / `wget` |
-| Search the web | `web_search` |
-| Invoke a skill (the `Skill` tool, `/command`) | Skills load natively. Follow the instructions presented. |
-| Dispatch a subagent (the `Agent`/`Task` tool) | `spawn_agent` |
-| Dispatch N parallel subagents in one turn | N `spawn_agent` calls in one response |
-| Wait for a subagent result | `wait_agent` |
-| Free a finished subagent slot | `close_agent` |
-| Track tasks (the todolist / `TodoWrite`) | `update_plan` |
-| Ask the human a fixed-choice question (`AskUserQuestion`) | Ask in plain text and let the user answer. Codex has no structured-choice tool. |
+| pstack / upstream action | Codex tool when listed | Fallback when absent |
+|--------------------------|------------------------|----------------------|
+| Read, search, run a command | `exec_command` (`rg`, `sed -n`, `cat`) | none needed |
+| Long-running or interactive process | `exec_command` returns a session id; poll or type with `write_stdin` | run to completion with a timeout |
+| Create, edit, delete a file | `apply_patch` | none needed |
+| Fetch a URL | `exec_command` with `curl`, when network is allowed | ask the user for the content |
+| Search the web | the listed web search tool, such as `web.run` | report the gap |
+| Invoke a skill (`Skill`, `/command`) | native skills; read the listed `SKILL.md` | read the file by path |
+| Dispatch a subagent (`Agent`/`Task`) | `spawn_agent` per [Subagent policy](#subagent-policy) | one sequential pass, stated in the report |
+| Wait for, message, close a subagent | the wait, message and close tools in the list (names differ by version, e.g. `wait_agent`, `send_input`, `close_agent`) | none |
+| Track tasks (`TodoWrite`) | `update_plan` | a short plan in commentary |
+| Fixed-choice question (`AskUserQuestion`) | `request_user_input` or its async variant (`request_user_input_async`) | ask in the final message and stop on that question |
+| Look at an image | `view_image` | describe the gap |
+| Deferred or connector tools | the listed tool catalog or `tool_search`; use MCP resource tools only for resources | report the gap |
+| Lifecycle hook | Codex hooks, only if the user's installed version and config define one | run the check explicitly at that step |
+| Recurring re-run (`loop`) | app automations (heartbeat) when listed | re-run the step yourself |
 
-Subagent dispatch needs `multi_agent` enabled. Add to `~/.codex/config.toml`:
-
-```toml
-[features]
-multi_agent = true
-```
-
-Without it, `spawn_agent` is unavailable and the fan-out skills (`interrogate`, `why`, `how`, `arena`, `reflect`) degrade to a single sequential pass.
+Never skip a repository's git hooks (`--no-verify`). Do not edit the user's Codex config to enable a missing tool; report it.
 
 ## Subagent policy
 
-poteto-mode's Subagents section sets Claude-specific defaults (`subagent_type: "poteto-agent"`, `run_in_background: true`). Those strings are Claude names. Do not register `poteto-agent` as a new Codex or Grok type. Translate at spawn time.
+Shared workflows may name `poteto-agent` or `general-purpose`. Translate their semantic role at dispatch; Codex uses the native contract below.
 
-### Type translation
+| Skill name | Codex |
+|------------|-------|
+| `poteto-agent` | `agent_type="default"`, `task_name="poteto-agent"`; the prompt reads the `poteto-mode` skill's `SKILL.md` in full first, including Principles |
+| `general-purpose` | `agent_type="default"` |
+| `comment-sicko` | `agent_type="default"`; the prompt reads `plugins/pstack/skills/no-comments/references/comment-sicko.md` in full first |
 
-| Skill name | Codex | Grok |
-|------------|-------|------|
-| `poteto-agent` | `spawn_agent` with `agent_type="default"`; `task_name="poteto-agent"`; prompt reads the `poteto-mode` skill's `SKILL.md` in full first, including Principles | `spawn_subagent` with `subagent_type="pstack:poteto-agent"`; prompt still reads that skill in full first |
-| `general-purpose` | `agent_type="default"` | `subagent_type="general-purpose"` |
-| `comment-sicko` | `agent_type="default"`; prompt reads `plugins/pstack/skills/no-comments/references/comment-sicko.md` in full first | `spawn_subagent` with `subagent_type="general-purpose"`; prompt reads that file in full first |
-
-`explore` / `explorer` are not pstack role carriers. Investigation roles use Codex `default` plus the matching selection in `pstack-models.md`. Grok's built-in `explore` is read-only lookup, not a poteto implementation delegate.
-
-If a runtime rejects the translated type, stop. Do not silently substitute Codex `worker` or Grok `general-purpose`. Those skips drop the skill read and let the type own model or effort.
-
-On Codex:
-
-- Use the `default` Codex agent type for every pstack role. Do not translate semantic roles into Codex types such as `worker`, `reviewer`, or `explorer`. A specialized type can own its model and reasoning effort. Put the pstack role in `task_name` and the prompt instead.
-- Resolve both `model` and `effort` from the same selection in `~/.codex/pstack-models.md`, using `~/.codex/AGENTS.md` for fixed/OCX resolution. Pass them explicitly as `model` and `reasoning_effort`. This applies to both namespaced and standalone pstack skills.
-- Record the role, model and effort before each dispatch batch and compare the actual payload with that selection. If either override is missing, mismatched, unsupported, or cannot be expressed by the tool, stop before spawning. An omitted model inherits the parent; it does not select the role's configured model.
-- Set `fork_turns` to `"none"` by default. Use a positive bounded count only when the task needs recent history.
-- `spawn_agent` calls already run concurrently with your turn, so `run_in_background: true` has no separate flag. Issue the dispatch and continue.
-
-On Grok:
-
-- Plugin agents are `plugin-name:agent-name`. The pstack agent is `pstack:poteto-agent`, not `poteto-agent`.
-- Resume an existing poteto child with `resume_from` rather than spawning a sibling.
-- Omit `model` unless the user named one. Grok spawn has no `reasoning_effort` field.
-
-Shared:
-
-- Claude Code runs every subagent on this machine, so the **swarm** skill's workers and the fan-out playbooks (`orchestrate`, `autopilot-full`, `autopilot-stack`) isolate writers with worktrees. The same holds on Codex and Grok.
-- Keep the rest of the policy unchanged. Pass file pointers not inlined context, give each worker its own worktree or branch when they write, review every subagent's diff yourself.
+- Use `agent_type="default"` for every pstack role. A specialized type (`worker`, `reviewer`, `explorer`) can own its model and effort. Put the role in `task_name` and the prompt. If the runtime rejects `default`, stop.
+- Resolve `model` and `reasoning_effort` as one pair per [`codex-routing.md`](codex-routing.md) and pass both explicitly. An omitted model inherits the parent; it does not select the role. If either field is missing, mismatched or unsupported by the listed spawn contract, stop before spawning.
+- `fork_turns` is `"none"` by default. Use a positive bounded count only when the child needs recent turns. Never fork full history with a model or effort override.
+- `spawn_agent` already runs concurrently with your turn; `run_in_background` has no separate flag.
+- Record role, model, effort and source before each batch. The child's final `turn_context` is the receipt of what actually ran; see [Receipts](codex-routing.md#receipts).
+- Isolate writers with worktrees or disjoint file sets. Pass file pointers, not inlined context. Review every child diff yourself.
 
 ## Codex spawn contract
 
@@ -79,33 +59,30 @@ Shared:
 
 ## Model names
 
-Skills name Codex+Grok defaults (a single-role fallback for unlisted judgment plus a diverse-model panel; each model-consuming skill lists its own in a Models section). On Codex the global policy overrides these catalog defaults.
+Catalog defaults are stamped from `models.json`. The active spawn contract determines which exact model and effort pairs can run.
 
 - Catalog fallback for unlisted judgment: `gpt-6-astra`. Named defaults appear in each skill's Models section.
 - Default panel catalog: `gpt-6-astra`, `gpt-6.1-sol`, `grok-4.7`. `arena`, `architect`, and `interrogate` use the subsets in their Models sections.
 
 Runtime selection:
 
-- Codex: resolve every role and panel slot through `~/.codex/AGENTS.md` and the YAML in `~/.codex/pstack-models.md`. Follow the active OpenCodex model and effort unchanged; when unavailable, use each selection's complete fallback pair. Preserve all panel slots, even when models repeat. The global policy owns availability checks and explicit user overrides.
-- Grok: `gpt-6.1-sol` becomes `ocx-gpt-6-1-sol`; `gpt-6-astra` becomes `ocx-gpt-6-astra`; `gpt-6-luna` becomes `ocx-gpt-6-luna`.
+Resolve every role and panel slot through `~/.codex/AGENTS.md` and the YAML in `~/.codex/pstack-models.md`. Keep explicit fixed selections. OCX selections follow the injected model and effort unchanged, or use their complete fallback pair. Adaptive selections use the task profile only when the user has enabled that policy. Preserve all panel slots, even when models repeat. Use the executable resolver and receipt checks in [Codex routing](codex-routing.md). `auto` and `inherit-parent` are legacy aliases, not Codex selections.
 
-`/setup-pstack` writes the configured model list.
+## Upstream built-in skills
 
-## Claude built-in skills pstack references
+Some upstream triggers name Claude Code built-ins. On Codex:
 
-Some triggers name skills that ship with Claude Code, not pstack. They do not exist on Codex. Substitute the behavior:
-
-| Claude built-in named in pstack | On Codex |
-|---------------------------------|----------|
-| `run` (drive a CLI/TUI to see a change work) | Run the app yourself via `shell` and observe the real output. |
-| `verify` (drive a UI to confirm a fix) | Drive the UI with whatever automation you have, or hand the user a concrete manual check. Do not claim done without observing the artifact. |
-| `plugin-dev:skill-development` (Claude's SKILL.md authoring guidance) | Follow your platform's skill-authoring guidance; the `writing-skills` skill if present. Keep `name` + `description` frontmatter and progressive disclosure. |
-| `loop` (recurring/self-paced re-invocation, used by `babysit`) | Codex has no `loop` skill. Re-run the step yourself on a cadence, or use a Codex scheduled task if available. |
+| Upstream built-in | On Codex |
+|-------------------|----------|
+| `run` | Run the app with `exec_command` (PTY via `write_stdin`) and observe real output. |
+| `verify` | Use the project's `.agents/skills/verify-<app>/` skill if present; otherwise drive the UI with a listed browser or desktop tool, or hand the user a concrete manual check. Do not claim done without observing the artifact. |
+| `plugin-dev:skill-development` | Follow Codex skill-authoring guidance (`skill-creator` if listed). Keep `name` and `description` frontmatter and progressive disclosure. |
+| `loop` | App automations when listed; otherwise re-run the step on a cadence yourself. |
 
 ## Vendored scripts
 
-`skills/poteto-mode/scripts/` ships the `watch-pr` PR watcher, the `orch` store CLI, and `worktree-audit.sh`. They are plain bun and bash, so they run the same on Codex; invoke them through `shell`. They need `bun`, `gh`, (for stack work) `gt`, and (for `worktree-audit.sh`) `jq` and `rg`. `worktree-audit.sh` reads Claude Code transcripts under `~/.claude/projects/`; point it at your runtime's transcript directory instead when you run it elsewhere.
+`skills/poteto-mode/scripts/` ships `watch-pr`, the `orch` store CLI, `worktree-audit.sh` and the `route.mjs` routing CLI. Run them with `exec_command`. The routing helper needs Bun. Existing watcher/store commands use their vendored Bun dependencies; stack work also needs `gh` and `gt`. `worktree-audit.sh` uses `jq` and `rg` and currently reads Claude Code history. On Codex, absent native chat evidence is a gap; do not treat its legacy recent-chat classification as proof that a worktree is unused.
 
 ## Instructions file
 
-Where a pstack skill says "your instructions file", on Codex that is `AGENTS.md` (project root, plus `~/.codex/AGENTS.md` global). On Claude Code it is `CLAUDE.md`.
+"Your instructions file" means `AGENTS.md`: the project's, plus the global one under `~/.codex/`. Codex prefers `AGENTS.override.md` over `AGENTS.md` at the same level when it exists.

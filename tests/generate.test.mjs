@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { codexModelNamesSection, setupModelsSection, strayModelSlugs } from "../tools/generate.mjs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import { createHash } from "node:crypto";
+import { dirname, join } from "node:path";
+import { codexModelNamesSection, dispatchProfilesSection, legacyModelNamesSection, setupModelsSection, strayModelSlugs, validateRoutingCatalog } from "../tools/generate.mjs";
 
 const models = JSON.parse(readFileSync(join(import.meta.dir, "../plugins/pstack/models.json"), "utf8"));
 
@@ -38,9 +41,12 @@ describe("model policy", () => {
     expect(prose).toContain("Preserve all panel slots");
     expect(prose).not.toContain("Otherwise skip that panel seat");
     expect(prose).not.toContain("xai/grok-4.7-build-fast");
-    expect(prose).toContain("`gpt-6.1-sol` becomes `ocx-gpt-6-1-sol`");
-    expect(prose).toContain("`gpt-6-luna` becomes `ocx-gpt-6-luna`");
-    expect(prose).not.toContain("ocx-deepseek-flash");
+    expect(prose).toContain("Adaptive selections");
+    expect(prose).not.toContain("ocx-gpt-6-1-sol");
+    const legacy = legacyModelNamesSection(models);
+    expect(legacy).toContain("`gpt-6.1-sol` becomes `ocx-gpt-6-1-sol`");
+    expect(legacy).toContain("`gpt-6-luna` becomes `ocx-gpt-6-luna`");
+    expect(legacy).not.toContain("ocx-deepseek-flash");
   });
 
   test("Codex setup preserves YAML selections instead of applying the Claude template", () => {
@@ -53,6 +59,58 @@ describe("model policy", () => {
     expect(codex).toContain("`defaults.judgment`");
     expect(codex).toContain("`defaults.evidence`");
     expect(codex).toContain("Do not apply the Claude Code template below");
+  });
+});
+
+describe("routing catalog generation", () => {
+  test("profiles and role references are generated from a validated catalog", () => {
+    expect(() => validateRoutingCatalog(models)).not.toThrow();
+    const table = dispatchProfilesSection(models);
+    expect(table).toContain("| evidence | `gpt-6-luna` / `medium` | `gpt-6-luna` / `high` | `gpt-6.1-sol` / `high` |");
+    const missing = structuredClone(models);
+    delete missing.codexRouting.profiles.evidence;
+    expect(() => validateRoutingCatalog(missing)).toThrow("missing profile");
+    const unknown = structuredClone(models);
+    unknown.codexRouting.profiles.evidence[0].model = "unlisted";
+    expect(() => validateRoutingCatalog(unknown)).toThrow("uncatalogued model");
+    const wrongRole = structuredClone(models);
+    wrongRole.roles[0].profile = "unknown";
+    expect(() => validateRoutingCatalog(wrongRole)).toThrow("unknown profile");
+  });
+
+  test("the real generator updates the shipped catalog, is idempotent, and supports independent skill copies", () => {
+    const repository = join(import.meta.dir, "..");
+    const fixture = mkdtempSync(join(tmpdir(), "pstack-generation-"));
+    const files = execFileSync("git", ["ls-files", "-co", "--exclude-standard", "-z"], { cwd: repository, encoding: "utf8" }).split("\0").filter(Boolean);
+    for (const path of new Set(files)) {
+      if (!existsSync(join(repository, path))) continue;
+      mkdirSync(dirname(join(fixture, path)), { recursive: true });
+      copyFileSync(join(repository, path), join(fixture, path));
+    }
+    const modelPath = join(fixture, "plugins/pstack/models.json");
+    const changed = JSON.parse(readFileSync(modelPath, "utf8"));
+    changed.codexRouting.profiles.implementation[0].effort = "high";
+    writeFileSync(modelPath, JSON.stringify(changed));
+    const generate = () => execFileSync(process.execPath, ["tools/generate.mjs"], { cwd: fixture, stdio: ["ignore", "pipe", "pipe"] });
+    generate();
+    const bundled = join(fixture, "plugins/pstack/skills/poteto-mode/scripts/models.generated.json");
+    expect(JSON.parse(readFileSync(bundled, "utf8"))).toEqual(changed);
+    expect(readFileSync(join(fixture, "plugins/pstack/skills/poteto-mode/references/codex-routing.md"), "utf8")).toContain("| implementation | `gpt-6.1-sol` / `high`");
+    const digests = () => files.filter((path) => existsSync(join(fixture, path))).map((path) => [path, createHash("sha256").update(readFileSync(join(fixture, path))).digest("hex")]);
+    const before = digests();
+    generate();
+    expect(digests()).toEqual(before);
+    const standalone = join(fixture, "standalone");
+    mkdirSync(standalone);
+    const scripts = join(fixture, "plugins/pstack/skills/poteto-mode/scripts");
+    for (const path of ["route.mjs", "models.generated.json"]) copyFileSync(join(scripts, path), join(standalone, path));
+    const config = join(standalone, "pstack-models.md");
+    writeFileSync(config, '```yaml\nroles:\n  bug-fix: {model: gpt-6.1-sol, effort: high}\n```\n');
+    const output = execFileSync(process.execPath, [join(standalone, "route.mjs"), "resolve", "--config", config], {
+      input: JSON.stringify({ contract: { "gpt-6.1-sol": ["high"] }, entries: [{ role: "bug-fix", message: "inspect this isolated fixture" }] }),
+      encoding: "utf8", stdio: ["pipe", "pipe", "pipe"],
+    });
+    expect(JSON.parse(output).entries[0].spawn).toEqual({ agent_type: "default", task_name: "bug-fix", model: "gpt-6.1-sol", reasoning_effort: "high", fork_turns: "none", message: "inspect this isolated fixture" });
   });
 });
 

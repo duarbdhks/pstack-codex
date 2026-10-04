@@ -156,24 +156,31 @@ Every `as` is a potential runtime crash. Cast only after the type system has ver
 // Don't
 const user = data as User;
 
-// Do. Earn the cast at the boundary.
-function parseUser(data: unknown): User {
-  if (typeof data !== "object" || data === null) {
-    throw new Error("expected object");
-  }
-  if (!("id" in data) || typeof (data as Record<string, unknown>).id !== "string") {
-    throw new Error("expected id");
-  }
-  // ... validate all fields
-  return data as User; // OK, earned cast after full validation
+// Don't. A hand-rolled guard proves less than the type claims.
+function isUser(data: unknown): data is User {
+  return typeof data === "object" && data !== null && "id" in data;
 }
+
+// Do. Parse with the schema that owns the shape (UserSchema above).
+const parsedUser = UserSchema.parse(data);
+```
+
+When the type comes first, annotate the schema with the type it proves. The compiler then rejects a schema that proves less than the type. Remove `role` from the object below and the assignment fails to compile.
+
+```ts
+type User = { id: string; role: "admin" | "member" };
+
+const UserSchema: z.ZodType<User> = z.object({
+  id: z.string().uuid(),
+  role: z.enum(["admin", "member"]),
+});
 ```
 
 When refactoring an `as` out of existing code, identify why TypeScript can't infer:
 
 - Missing discriminant: add one, switch to a discriminated union.
 - Overly wide source type (e.g. `Record<string, unknown>`): narrow it.
-- Untyped boundary: add a parse function or schema.
+- Untyped boundary: parse with the schema that owns the shape. Add a schema only where none exists, with the library the repository already uses.
 - Genuinely inexpressible: use a branded type or `satisfies`.
 
 ## Narrowing hierarchy

@@ -1,4 +1,4 @@
-name: Sync upstream
+name: Review upstream
 
 on:
   schedule:
@@ -13,192 +13,40 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  sync:
-    name: Sync upstream
+  review:
+    name: Report upstream candidates
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # commits the synced tree and pushes branch sync/upstream
-      pull-requests: write # opens and squash-merges the sync PR when the run is clean
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # This job pushes, so it is the one checkout that keeps its token.
-          persist-credentials: true
-          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: "1.3.14"
-      - name: Sync, PR, and maybe merge
-        env:
-          GH_TOKEN: ${{ github.token }}
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      - name: Preview each component
         run: |
           set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
+          mkdir -p upstream-reports
           remote="$(jq -r .remote tools/upstream.json)"
-          scratch="$(mktemp -d)"
-          report="$(mktemp)"
-          trap 'rm -rf "$scratch" "$report"' EXIT
-          git clone --quiet --filter=blob:none --no-checkout "$remote" "$scratch"
-
-          any_sync=0
-          all_ok=1
-
-          sync_one() {
-            local component="$1"
-            local pin upstreamPath pin_tree head_tree head_sha pin_code head_code action code out
-            pin="$(jq -r --arg c "$component" '.components[$c].sha' tools/upstream.json)"
-            upstreamPath="$(jq -r --arg c "$component" '.components[$c].upstreamPath' tools/upstream.json)"
-            set +e
-            pin_tree="$(git -C "$scratch" rev-parse "${pin}^{commit}:${upstreamPath}" 2>/dev/null)"
-            pin_code=$?
-            head_tree="$(git -C "$scratch" rev-parse "HEAD:${upstreamPath}" 2>/dev/null)"
-            head_code=$?
-            head_sha="$(git -C "$scratch" rev-parse HEAD)"
-            set -e
-            if [ "$pin_code" -ne 0 ] || [ "$head_code" -ne 0 ]; then
-              all_ok=0
-              {
-                printf '## %s\n' "$component"
-                printf 'failed: no tree for %s at pin or HEAD\n\n' "$upstreamPath"
-              } >> "$report"
-              return 0
-            fi
-            action="$(bun tools/sync-plan.mjs component "$pin_tree" "$head_tree")"
-            if [ "$action" = "skip" ]; then
-              {
-                printf '## %s\n' "$component"
-                printf 'skipped: pin tree %s is current\n\n' "$pin_tree"
-              } >> "$report"
-              return 0
-            fi
-            any_sync=1
-            set +e
-            out="$(bun tools/sync.mjs "$component" "$head_sha" 2>&1)"
-            code=$?
-            set -e
-            {
-              printf '## %s\n' "$component"
-              printf 'exit: %s\n' "$code"
-              printf '%s\n\n' "$out"
-            } >> "$report"
-            if [ "$code" -ne 0 ]; then
-              all_ok=0
-            fi
-            if printf '%s\n' "$out" | grep -q 'needs manual merge'; then
-              all_ok=0
-            fi
-          }
-
-          sync_one pstack
-          sync_one cursor-team-kit
-
-          if [ "$any_sync" -eq 0 ]; then
-            echo "ok: every component skipped"
-            exit 0
-          fi
-
-          # Refresh a bot-owned sync branch in place. A human commit means
-          # someone is mid-review, so report and leave the branch alone.
-          # That includes a closed PR whose branch is still on the remote.
-          pr_number="$(gh pr list --head sync/upstream --state open --json number --jq '.[0].number // empty')"
-          remote_tip="$(git ls-remote origin refs/heads/sync/upstream | awk '{print $1}')"
-          open_flag=0
-          remote_flag=0
-          authors=""
-          if [ -n "$pr_number" ]; then
-            open_flag=1
-          fi
-          if [ -n "$remote_tip" ]; then
-            remote_flag=1
-            # checkout is depth 1. A shallow log would only see the tip author
-            # and could hide a human commit under it. A bare branch name
-            # updates FETCH_HEAD only, and the author walk reads the
-            # remote-tracking refs.
-            if [ -f .git/shallow ]; then
-              git fetch --unshallow origin \
-                "+refs/heads/${DEFAULT_BRANCH}:refs/remotes/origin/${DEFAULT_BRANCH}" \
-                "+refs/heads/sync/upstream:refs/remotes/origin/sync/upstream"
-            else
-              git fetch origin \
-                "+refs/heads/${DEFAULT_BRANCH}:refs/remotes/origin/${DEFAULT_BRANCH}" \
-                "+refs/heads/sync/upstream:refs/remotes/origin/sync/upstream"
-            fi
-            authors="$(git log --format='%an' "origin/${DEFAULT_BRANCH}..origin/sync/upstream")"
-          fi
-          push_action="$(bun tools/sync-plan.mjs push "$(printf '%s\n%s\n%s\n' "$open_flag" "$remote_flag" "$authors")")"
-          if [ "$push_action" = "report-only" ]; then
-            echo "ok: sync/upstream has human commits; reporting only"
-            cat "$report"
-            exit 0
-          fi
-
-          set +e
-          bun tools/generate.mjs
-          gen_code=$?
-          set -e
-          if [ "$gen_code" -ne 0 ]; then
-            all_ok=0
-            printf '## generate\nexit: %s\n\n' "$gen_code" >> "$report"
-          fi
-
-          if git diff --quiet && git diff --cached --quiet && [ -z "$(git ls-files --others --exclude-standard)" ]; then
-            echo "ok: no diff after generate"
-            exit 0
-          fi
-
-          git checkout -B sync/upstream
-          git add -A
-          git commit -m "chore(sync): upstream pstack/cursor-team-kit"
-          if [ "$push_action" = "force-with-lease" ]; then
-            # The lease reads origin/sync/upstream. A bare branch name would
-            # update FETCH_HEAD only, so a raced push would not fail the lease.
-            git fetch origin "+refs/heads/sync/upstream:refs/remotes/origin/sync/upstream"
-            git push --force-with-lease origin sync/upstream
-          elif [ "$push_action" = "push" ]; then
-            git push -u origin sync/upstream
-          else
-            echo "unexpected push action: $push_action"
+          upstream_sha="$(git ls-remote "$remote" HEAD | awk '{print $1}')"
+          if ! [[ "$upstream_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Could not resolve upstream HEAD"
             exit 1
           fi
-
-          body="$(mktemp)"
-          {
-            printf '%s\n\n' "Automated upstream sync."
-            cat "$report"
-          } > "$body"
-          if [ -n "$pr_number" ]; then
-            gh pr edit "$pr_number" --body-file "$body"
-          else
-            set +e
-            gh pr create --base "$DEFAULT_BRANCH" --head sync/upstream --title "chore(sync): upstream pstack/cursor-team-kit" --body-file "$body"
-            pr_code=$?
-            set -e
-            if [ "$pr_code" -ne 0 ]; then
-              echo "pr create failed; branch remains sync/upstream"
-              all_ok=0
+          while IFS= read -r component; do
+            bun tools/sync.mjs "$component" "$upstream_sha" --json > "upstream-reports/${component}.json"
+            status="$(jq -r .status "upstream-reports/${component}.json")"
+            count="$(jq '.candidates | length' "upstream-reports/${component}.json")"
+            printf '%s: %s (%s changes; pin held)\n' "$component" "$status" "$count" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$status" = "needs-review" ]; then
+              echo "::notice title=Upstream review required::$component has $count changes awaiting a decision"
             fi
-          fi
-          rm -f "$body"
-
-          verify_ok=1
-          set +e
-          bash tests/skill-collision-repro.sh || verify_ok=0
-          bun tools/generate.mjs && git diff --exit-code || verify_ok=0
-          bun test tests/ || verify_ok=0
-          (
-            cd plugins/pstack/skills/poteto-mode/scripts && bun install --frozen-lockfile && bun run typecheck && bun test orch watch-pr
-          ) || verify_ok=0
-          {
-            find . -path ./.git -prune -o -path '*/node_modules' -prune -o -name '*.sh' -print
-            grep -rlE --exclude-dir=.git --exclude-dir=node_modules '^#!/(usr/bin/env )?(ba)?sh' .
-          } | sed 's#^\./##' | sort -u | tee /dev/stderr | xargs shellcheck --severity=warning || verify_ok=0
-          set -e
-
-          if [ "$all_ok" -eq 1 ] && [ "$verify_ok" -eq 1 ]; then
-            gh pr merge sync/upstream --squash --delete-branch
-          else
-            echo "leaving PR open (all_ok=$all_ok verify_ok=$verify_ok)"
-          fi
+          done < <(jq -r '.components | keys[]' tools/upstream.json)
+      - name: Upload candidate reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: upstream-candidates
+          path: upstream-reports/
+          if-no-files-found: error
+          retention-days: 14

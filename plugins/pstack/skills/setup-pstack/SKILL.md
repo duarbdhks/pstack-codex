@@ -10,15 +10,22 @@ Configure per-role model selections for the current runtime. Choose the matching
 
 ## Codex
 
-1. Read `~/.codex/AGENTS.md` and the YAML in `~/.codex/pstack-models.md`. The global policy governs all roles, status checks, explicit user overrides and fallback. Use the active spawn contract to validate exact model IDs and effort pairs, not the catalog alone.
+Routing forms and the router are described in [`codex-routing.md`](../poteto-mode/references/codex-routing.md); the global policy block is in [`codex-routing-policy.md`](../poteto-mode/references/codex-routing-policy.md). Prepare concrete diffs for the requested roles and any required policy migration. Apply only the requested changes.
+
+1. Read `~/.codex/AGENTS.md` and the YAML in `~/.codex/pstack-models.md`. Note whether the policy carries the `<!-- pstack-routing:1 -->` marker; without it only fixed and `source: ocx` selections are valid. Validate exact model IDs and effort pairs against the spawn contract listed in this turn, not the catalog alone.
 2. Show the current selections and fallback pairs. Preserve `defaults`, role order, grouped role names and every array's purpose, order and panel slots. Resolve OCX once per batch using the global policy; describe fallback availability separately from whether OCX is currently usable.
-3. Apply requested changes in the same YAML block. Keep `source: ocx` with a complete `fallback: {model, effort}` for every default, role and panel slot unless the user explicitly chooses a fixed pair. When converting a fixed pair to OCX, preserve that pair as its fallback. A changed OCX model belongs in OpenCodex, not a hard-coded copy in this file; changing OpenCodex requires the user's request.
-4. Validate both fields of every fallback against the active spawn contract. If creating a missing sheet, include `defaults.judgment` and `defaults.evidence`, take role names and panel counts from the generated role list below, and confirm supported fallback pairs. Do not copy catalog aliases, guess effort or inherit the parent model. Reject incomplete or mixed fixed/OCX selections.
-5. Save only the requested role settings in `~/.codex/pstack-models.md`. Keep policy in `~/.codex/AGENTS.md`; do not paste or duplicate the YAML there. Report the changed selections and how they resolve.
+3. Ask which roles to change and the target form for each: fixed, `source: ocx`, or `source: adaptive` with a `profile` from the generated Dispatch profiles table in `codex-routing.md` (offer the role's default `profile` first). Use `request_user_input` when it is listed; otherwise ask in plain text and stop. Change nothing the user did not pick.
+4. For an adaptive choice, preview before writing: run `route.mjs resolve` for that role and profile at the lowest, middle and highest axis values, and show each resolved pair beside the current selection. Use an explicit temporary sheet and a temporary policy containing only the bundled managed block for the preview, not the real global files. Make no cost or pricing claim.
+5. If any chosen role is adaptive and the marker is missing, follow the policy file's install rules: show a unified diff that replaces only the selection-forms passage of `~/.codex/AGENTS.md`, and apply it only on explicit request. If that passage cannot be identified or a contradicting rule remains, stop with the diff and the conflicting lines.
+6. Apply the chosen changes in the same YAML block. An OCX selection carries a complete `fallback: {model, effort}`; converting a fixed pair to OCX preserves that pair as its fallback. Adaptive selections carry only `source: adaptive` and the chosen `profile`. Preserve the previous selection in the shown diff so it can be restored. Leave every other role exactly as it was: never migrate existing fixed or OCX selections in bulk. A changed OCX model belongs in OpenCodex, not a hard-coded copy here; changing OpenCodex requires the user's request.
+7. Validate both fields of every fallback against the listed spawn contract. If creating a missing sheet, include `defaults.judgment` and `defaults.evidence`, take role names and panel counts from the generated role list below, and confirm supported fallback pairs. Do not copy catalog aliases, guess effort or inherit the parent model. Reject incomplete or mixed selections.
+8. Save only the approved role settings in `~/.codex/pstack-models.md`. Keep policy text in `~/.codex/AGENTS.md`; do not paste the YAML there. Report the changed selections, how each resolves, and any policy diff that was applied or left pending.
 
 Do not apply the Claude Code template below on Codex. Model and effort are always explicit; `inherit-parent` and `auto` are not Codex selections.
 
 ## Claude Code
+
+Legacy runtime; see [`legacy-tools.md`](../poteto-mode/references/legacy-tools.md).
 
 Write `~/.claude/pstack-models.md` and include it from `CLAUDE.md`. Pick reachable slugs from the sidecar catalog in Models. Each skill's defaults apply only when the override sheet has no matching role.
 

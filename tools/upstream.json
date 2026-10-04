@@ -4,7 +4,7 @@
     "pstack": {
       "upstreamPath": "pstack",
       "localPath": "plugins/pstack",
-      "sha": "12d587dfb20741cafc376c42c696c5f6e2a64487",
+      "sha": "e43c7ee26e0038c6c1fa8380dd34ce86ff94cb2a",
       "exclude": [
         {
           "pathPrefix": "automations/",
@@ -46,7 +46,8 @@
           "pathPrefix": "LICENSE",
           "reason": "upstream license already carried at the repo root"
         }
-      ]
+      ],
+      "review": "tools/upstream-review.json"
     },
     "cursor-team-kit": {
       "upstreamPath": "cursor-team-kit/skills",

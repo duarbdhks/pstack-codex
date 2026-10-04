@@ -1,16 +1,12 @@
-# CONTEXT — domain glossary
+# Context and ownership
 
-Names for the concepts this repo's design discussions keep reaching for. Architecture reviews use these terms; if a review needs a concept that isn't here, add it.
-
-- **Build** — one of the runtimes the plugin ships to: the Codex build (`.codex-plugin/`) and the Prime path (`~/.agents/skills/` symlinks). Both share one `skills/` tree; each is an adapter over it.
-- **Model policy** — the mapping from roles to model slugs. Defaults live in `plugins/pstack/models.json` (Codex+Grok catalog at the top level) and are stamped into each skill's Models section; the user's override sheet (`~/.codex/pstack-models.md`, written by `setup-pstack`) is the layer that adapts them at runtime.
-- **Role** — a named unit of delegated work with its own model choice (`arena runners`, `how explorer`, `swarm workers`). The role vocabulary lives in `models.json` and surfaces in `setup-pstack`'s sheet.
-- **Panel** — the diverse-model catalog for `arena`, `architect`, and `interrogate`; each skill selects its own subset from `models.json`. The generator stamps every copy and fails on strays. The shipped panel has Astra, Sol, and one external Grok seat, which can resolve to DeepSeek through OpenCodex.
-- **Prompt stub** (or trampoline) — a file under `.codex-plugin/prompts/` whose body invokes its skill. Codex-only, generated from the skill's `menu-description`.
-- **Menu description** — the `menu-description:` frontmatter one-liner every public skill carries. Renders as the Codex slash-menu text and the README command-table row; the long `description:` stays the trigger-matching prose.
-- **Generator** — `tools/generate.mjs`. Stamps facts from their single source into every committed copy and validates cross-file contracts. CI reruns it and fails on any diff.
-- **Generator-owned copy** — a committed value the generator writes (the `version` field in the Codex manifest, the prompt stubs, the README slash-command table, every Models section). Hand edits are reverted by the next regeneration and caught by CI.
-- **VERSION** — the repo-root file holding the canonical plugin version. Releases edit it, add the matching `CHANGES.md` heading, and regenerate; plugin auto-update installs by this number.
-- **Sync boundary** — the split between what upstream pstack owns (skill content) and what this port owns (Cursor-to-Claude-Code translation). Defined in [CONTRIBUTING.md](CONTRIBUTING.md); enforced by `tools/sync.mjs`, whose substitution table and denylist live in `tools/substitutions.json`.
-- **Upstream pin** — the per-component upstream SHA in `tools/upstream.json` that the port is synced to. `sync.mjs` advances it only when a sync completes without denylist hits.
-- **Invariant script** — `tests/skill-collision-repro.sh`. The repo's check seam: static layout/flag invariants (one named function each, run through `check`). `tests/invariants.test.mjs` proves each static check can fail, against fixture trees.
+- **Shared workflow** is an upstream-derived principle or playbook. Keep its provenance and record deliberate behavioral differences.
+- **Native contract** is pstack-codex's definition of Codex tool use, dispatch, configuration, and evidence. It owns those behaviors rather than inheriting a legacy runtime's syntax.
+- **Model catalog** is `plugins/pstack/models.json`. It owns role metadata and adaptive profiles; it does not list the runtime's currently supported spawn pairs.
+- **User selection** is a fixed pair, an OCX selection with a complete fallback, or an explicitly enabled adaptive profile in `pstack-models.md`.
+- **Panel** preserves configured slot count, order, and duplicates. Slots resolving to one model provide independent contexts, not vendor diversity.
+- **Receipt** records requested model and effort and compares them with the exact child's final `turn_context`.
+- **Generator-owned copy** is a prompt, model section, or bundled catalog produced by `tools/generate.mjs`. The source catalog and skill frontmatter are edited instead.
+- **Review pin** is the last fully reviewed upstream revision in `tools/upstream.json`. It advances only after decisions are complete and core verification succeeds.
+- **Review decision** binds an adoption, adaptation, exclusion, or deferral to source content. Adaptation and exclusion also bind the reviewed local content.
+- **Release** changes `VERSION`, records `CHANGES.md`, regenerates the plugin manifest, and passes affected checks. Updating installed copies is a separate operation.

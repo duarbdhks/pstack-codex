@@ -1,0 +1,123 @@
+{
+  "version": 1,
+  "components": {
+    "pstack": {
+      "from": "12d587dfb20741cafc376c42c696c5f6e2a64487",
+      "to": "e43c7ee26e0038c6c1fa8380dd34ce86ff94cb2a",
+      "decisions": [
+        {
+          "path": "skills/architect/SKILL.md",
+          "revision": "741901140ee382ebf93263a7ed03c6ee3719e578416d81afcd195876fa16c496",
+          "localRevision": "dae79baf77e7de3ac4b66f1c4ee10a22663b913254908cc3b81bb2bc310962aa",
+          "action": "adapt",
+          "reason": "Judge the next change as an agent contribution and reference one canonical red-flag list."
+        },
+        {
+          "path": "skills/architect/references/design-red-flags.md",
+          "revision": "d0e639e4cc588ec865f930d3a4111faad60987ae36925917e319d7ceca7c69ce",
+          "localRevision": "a8a1c767815fe1e68d8ed571f9d6575574cdecc9c58a3adeb37cd1016001de2a",
+          "action": "adapt",
+          "reason": "Add ownership, duplicate-path, internal-import and list-drift checks while rejecting forwarding layers."
+        },
+        {
+          "path": "skills/benchmark-checklist/SKILL.md",
+          "revision": "6a767e788a60428fa14e645ee10fe2e49896e514ff654f668b1d824deb9038e8",
+          "localRevision": "525c3dfd7d505fa732b03ad9316a71b0f238fa013a84f4579e53db20e2dfd821",
+          "action": "adapt",
+          "reason": "Validate limiter, tuning, failures, actual work and repeated measurements with macOS and Linux drivers."
+        },
+        {
+          "path": "skills/correct/SKILL.md",
+          "revision": "bf482bacc972b3f124a4af8bf9364b4b3e280cb5845e44c326ea4f4565e5c904",
+          "localRevision": "a7a750dc7d953b84c07e329d26e780e00997373b688dcdc68a787b78cc50a8ff",
+          "action": "adapt",
+          "reason": "Explicitly invoked repository-scoped correction; require repeated history and a real negative proof, without global memory writes."
+        },
+        {
+          "path": "skills/poteto-mode/SKILL.md",
+          "revision": "404c0ef4a78e93451b2ab555ca532e7197b5cf87de29205b6f7109dbee5d9c4d",
+          "localRevision": "3b487ca1339b2690866dc8c26b276f471983a0af9807f74d73920c332d9b2e90",
+          "action": "adapt",
+          "reason": "Use Codex-native dispatch and model/effort policy; add measurement principles and fresh independent child contexts."
+        },
+        {
+          "path": "skills/poteto-mode/playbooks/autopilot-full.md",
+          "revision": "05ca30a16242c19d0c78ba1e88cca66f858d75252cb154fd740099fe292de802",
+          "localRevision": "f6c74df290739ad555a1489dd8d1de65477367db7b5d9b89f703de62db9219ab",
+          "action": "exclude",
+          "reason": "Retain Codex scheduling and explicit push authorization; no fixed hourly Cursor loop."
+        },
+        {
+          "path": "skills/poteto-mode/playbooks/autopilot-stack.md",
+          "revision": "007c0a3b12011954a224f54773ef4ad7b75918be0a311914c1b51ad4e794c1e5",
+          "localRevision": "7a218f60ab81546f1e45d96d6f4f31bebaf2a22d6347687343025459aaca4440",
+          "action": "exclude",
+          "reason": "Retain native standing orders and operator merge boundary; no automatic push rule."
+        },
+        {
+          "path": "skills/poteto-mode/playbooks/hillclimb.md",
+          "revision": "244f289898fe67a458065e90fe8217c916c5acf61cdee8975ade3f9831a12e91",
+          "localRevision": "a75ebf449bfe5a2e215d6025608a0e4b490a17d23e1ba6f26739fca4a819fe85",
+          "action": "adapt",
+          "reason": "Vet the frozen measurement harness; borrow only hypothesis order and preserve the hillclimb stopping predicate."
+        },
+        {
+          "path": "skills/poteto-mode/playbooks/multi-phase-plan.md",
+          "revision": "27d310e3fc3937a60b8fcbe1318f9d249a7477a722907bf85b3e4eb3dc436b11",
+          "localRevision": "78fd325c07b9a5ae215a3bf0b218b226cc3cc4a0e72f06ed89aee0e585a7f993",
+          "action": "exclude",
+          "reason": "Retain native plan markers and approved scheduling behavior."
+        },
+        {
+          "path": "skills/poteto-mode/playbooks/opening-a-pr.md",
+          "revision": "ab40de7163c1c6e274f46ee559b2e53ef45673703f601f13f4931c199e6fb90f",
+          "localRevision": "35bac1593ed629c23fe9b4b15a6220d39f313dfaaacd07189f0dc6a8c147fa2b",
+          "action": "adapt",
+          "reason": "Brief the reviewer through available PR tools, attach app artifacts, and preserve authorization for pushes and merges."
+        },
+        {
+          "path": "skills/poteto-mode/playbooks/perf-issue.md",
+          "revision": "2b88ad0f880e4d4d755ac19fe52414d6631d6baa816d060f53cf0a7429d7e14a",
+          "localRevision": "392b9f93839487d9543d1007b3f585f845ebbeb769df7bad161efd3cc111dd65",
+          "action": "adapt",
+          "reason": "Verify the baseline and later numbers; prefer eliminating unused work before changing its cost."
+        },
+        {
+          "path": "skills/poteto-mode/scripts/check-plan.mjs",
+          "revision": "4f9432d9989880b6afc2bdda503d5b12a9d07d357ecf31936b7ab5e83bc80523",
+          "localRevision": "6323c7b4b37c72f5507bdd48ca9b139dc423ef1a35707f564a34f9af0503d586",
+          "action": "exclude",
+          "reason": "Retain checker markers for the existing Codex plan contract."
+        },
+        {
+          "path": "skills/principle-explain-the-number/SKILL.md",
+          "revision": "5aac99e7ce0bb1b37e2579acf4fe88c32a1456d9d46afd4a57cfe1df9092e89c",
+          "localRevision": "11709c46e17a134c87a3247e313c4f877819d11f1fb6e379b59066194f2edefc",
+          "action": "adapt",
+          "reason": "Require evidence that a measured value represents real work and has an identified limiter."
+        },
+        {
+          "path": "skills/swarm/SKILL.md",
+          "revision": "bdcee4168e22428036e93d7cdeec3f391dbc4132f927f6db2540328c22db0273",
+          "localRevision": "f04e4df7134e444e3f167ec97c24028b0c1e6ff12cc522e49eeb35a0b0807f85",
+          "action": "adapt",
+          "reason": "Respawn a fresh worker once for invalid evidence while retaining exact model/effort preflight and explicit gaps."
+        },
+        {
+          "path": "skills/technical-writing/SKILL.md",
+          "revision": "f5c512ffeec70bc4e0dee50f7bb4c26742e1be77967a6e8b15d1921e1c209ceb",
+          "localRevision": "1fc5bead47b1e7fb134305f9ca6e72208f09dfee10e28d644cff17bedc493527",
+          "action": "exclude",
+          "reason": "Retain useful source attribution; deleting those lines is unrelated to this improvement."
+        },
+        {
+          "path": "skills/typescript-best-practices/references/patterns.md",
+          "revision": "faa1362055374452efccac1b629677c61acfb0bcc6c4e3311836b5715638ee18",
+          "localRevision": "c80c423f4a1775b43ca8e6e5b26991c4dbc0c0e903f3489d83ef885a1f6944f9",
+          "action": "adapt",
+          "reason": "Use a schema-first boundary example and derived types; do not add a dependency to the repository."
+        }
+      ]
+    }
+  }
+}
