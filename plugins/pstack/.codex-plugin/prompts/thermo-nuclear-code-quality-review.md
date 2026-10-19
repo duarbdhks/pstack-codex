@@ -1,6 +1,6 @@
 ---
 name: thermo-nuclear-code-quality-review
-description: extremely strict maintainability audit
+description: "extremely strict maintainability audit"
 disable-model-invocation: true
 ---
 

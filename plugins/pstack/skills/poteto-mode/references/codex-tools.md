@@ -1,6 +1,6 @@
 # Codex tool mapping for pstack
 
-pstack skills keep upstream wording (`Skill`, `Agent`, `AskUserQuestion`) so workflows stay comparable with upstream. On Codex, resolve each action through this map. Model and effort resolve through [`codex-routing.md`](codex-routing.md). Claude Code and Grok specifics live in [`legacy-tools.md`](legacy-tools.md).
+pstack skills mirror upstream Cursor wording (`Task`, `AskQuestion`, `control-cli`, `~/.cursor/projects/`) so they stay identical to upstream. On Codex, resolve each action through this map. Upstream model names arrive as `<role model>`; the role's model and effort resolve through [`codex-routing.md`](codex-routing.md). Claude Code and Grok specifics live in [`legacy-tools.md`](legacy-tools.md).
 
 ## Capability discovery
 
@@ -15,11 +15,16 @@ The tool list of the current turn is the only source of truth. Availability chan
 | Create, edit, delete a file | `apply_patch` | none needed |
 | Fetch a URL | `exec_command` with `curl`, when network is allowed | ask the user for the content |
 | Search the web | the listed web search tool, such as `web.run` | report the gap |
-| Invoke a skill (`Skill`, `/command`) | native skills; read the listed `SKILL.md` | read the file by path |
-| Dispatch a subagent (`Agent`/`Task`) | `spawn_agent` per [Subagent policy](#subagent-policy) | one sequential pass, stated in the report |
+| Invoke a skill (`Skill`, `/command`) | native skills; pstack skills are explicit-only, so invoke `$pstack:<skill>` or read the listed `SKILL.md` | read the sibling `skills/<skill>/SKILL.md` by path |
+| Dispatch a subagent (`Agent`/`Task`, `subagent_type`) | `spawn_agent` per [Subagent policy](#subagent-policy) | one sequential pass, stated in the report |
+| Cloud agent (`Cursor cloud agent`) | a local `spawn_agent` child working in its own git worktree | one sequential pass, stated in the report |
 | Wait for, message, close a subagent | the wait, message and close tools in the list (names differ by version, e.g. `wait_agent`, `send_input`, `close_agent`) | none |
 | Track tasks (`TodoWrite`) | `update_plan` | a short plan in commentary |
-| Fixed-choice question (`AskUserQuestion`) | `request_user_input` or its async variant (`request_user_input_async`) | ask in the final message and stop on that question |
+| Fixed-choice question (`AskQuestion`/`AskUserQuestion`) | `request_user_input` or its async variant (`request_user_input_async`) | ask in the final message and stop on that question |
+| Drive a CLI or TUI (`control-cli`) | `exec_command` with a PTY session; type with `write_stdin` | run the command non-interactively |
+| Drive a UI (`control-ui`) | the listed browser or computer-use tools | report the gap |
+| Read past chats (`~/.cursor/projects/` transcripts) | the thread tools when listed (`list_threads`, `read_thread`); otherwise `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` | ask the user for the context |
+| Standing objective (`/goal`) | `create_goal` and `update_goal` when listed | keep the objective in the plan |
 | Look at an image | `view_image` | describe the gap |
 | Deferred or connector tools | the listed tool catalog or `tool_search`; use MCP resource tools only for resources | report the gap |
 | Lifecycle hook | Codex hooks, only if the user's installed version and config define one | run the check explicitly at that step |
@@ -34,7 +39,7 @@ Shared workflows may name `poteto-agent` or `general-purpose`. Translate their s
 | Skill name | Codex |
 |------------|-------|
 | `poteto-agent` | `agent_type="default"`, `task_name="poteto-agent"`; the prompt reads the `poteto-mode` skill's `SKILL.md` in full first, including Principles |
-| `general-purpose` | `agent_type="default"` |
+| `general-purpose`, `generalPurpose` | `agent_type="default"` |
 | `comment-sicko` | `agent_type="default"`; the prompt reads `plugins/pstack/skills/no-comments/references/comment-sicko.md` in full first |
 
 - Use `agent_type="default"` for every pstack role. A specialized type (`worker`, `reviewer`, `explorer`) can own its model and effort. Put the role in `task_name` and the prompt. If the runtime rejects `default`, stop.

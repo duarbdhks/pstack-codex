@@ -20,6 +20,7 @@ Routing forms and the router are described in [`codex-routing.md`](../poteto-mod
 6. Apply the chosen changes in the same YAML block. An OCX selection carries a complete `fallback: {model, effort}`; converting a fixed pair to OCX preserves that pair as its fallback. Adaptive selections carry only `source: adaptive` and the chosen `profile`. Preserve the previous selection in the shown diff so it can be restored. Leave every other role exactly as it was: never migrate existing fixed or OCX selections in bulk. A changed OCX model belongs in OpenCodex, not a hard-coded copy here; changing OpenCodex requires the user's request.
 7. Validate both fields of every fallback against the listed spawn contract. If creating a missing sheet, include `defaults.judgment` and `defaults.evidence`, take role names and panel counts from the generated role list below, and confirm supported fallback pairs. Do not copy catalog aliases, guess effort or inherit the parent model. Reject incomplete or mixed selections.
 8. Save only the approved role settings in `~/.codex/pstack-models.md`. Keep policy text in `~/.codex/AGENTS.md`; do not paste the YAML there. Report the changed selections, how each resolves, and any policy diff that was applied or left pending.
+9. Offer a formal verification skill (optional). Check whether the project already has a formal verification skill (a project skill that runs a model checker, a proof, or another verifier against the code). If not, offer once: "want a formal verification skill, so agents can prove a key property of your code holds in every case in scope, not only the cases tests reach? I can generate one with /create-formal-verification-skill." On yes, invoke `$pstack:create-formal-verification-skill` or read its `SKILL.md` from the sibling skill directory. On no, move on without pushing.
 
 Do not apply the Claude Code template below on Codex. Model and effort are always explicit; `inherit-parent` and `auto` are not Codex selections.
 
@@ -98,3 +99,7 @@ Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs
 - Available models: GPT-6 Astra (`gpt-6-astra`), GPT-6.1 Sol (`gpt-6.1-sol`), Claude Opus 5.5 (`anthropic/claude-opus-5-5`), GPT-6 Luna (`gpt-6-luna`), Grok 4.7 (`grok-4.7`), Grok 4.6 (`grok-4.6`), DeepSeek Flash (`deepseek-flash`), GPT-5.5 (`gpt-5.5`), GPT-5.4 (`gpt-5.4`)
 - Default panel: `gpt-6-astra`, `gpt-6.1-sol`, `grok-4.7`
 - Single-role default: `gpt-6-astra`
+
+## Codex runtime
+
+On Codex, upstream tool, path, and agent names in this skill map through [codex-tools.md](../poteto-mode/references/codex-tools.md). A `<role model>` placeholder is the role's model resolved by [Codex routing](../poteto-mode/references/codex-routing.md). Where a step here says to omit `model`, run on the parent model, or fall back to another slug after a rejection, the Codex spawn contract wins: resolve the pair or stop before spawning.

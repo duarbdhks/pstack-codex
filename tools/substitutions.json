@@ -1,54 +1,54 @@
 {
   "substitutions": [
     {
-      "pattern": "AskQuestion",
-      "replacement": "AskUserQuestion",
-      "rationale": "Claude Code's fixed-choice question tool; upstream Cursor names it AskQuestion"
+      "pattern": "~/.cursor/rules/pstack-models.mdc",
+      "replacement": "~/.codex/pstack-models.md",
+      "rationale": "the Codex model override sheet written by /setup-pstack"
     },
     {
-      "pattern": "the `Task` tool",
-      "replacement": "the `Agent` tool",
-      "rationale": "Claude Code dispatches subagents with the Agent tool; Cursor calls it Task"
+      "pattern": "~/.cursor/skills/",
+      "replacement": "~/.agents/skills/",
+      "rationale": "personal skills directory Codex scans"
     },
     {
       "pattern": ".cursor/skills/",
-      "replacement": ".claude/skills/",
-      "rationale": "personal skills directory"
+      "replacement": ".agents/skills/",
+      "rationale": "repository skills directory Codex scans"
     },
     {
-      "pattern": ".cursor/rules/",
-      "replacement": "CLAUDE.md imports",
-      "rationale": "Claude Code has no auto-applied rules directory; inclusion is explicit via CLAUDE.md"
+      "pattern": "~/.cursor/plugins/",
+      "replacement": "~/.codex/plugins/cache/",
+      "rationale": "installed plugin cache"
     }
   ],
   "denylist": [
     {
       "token": "control-cli",
-      "hint": "Claude Code's `run` built-in drives CLIs/TUIs; rewrite the sentence, don't token-swap"
+      "hint": "drive CLIs/TUIs with exec_command PTY sessions per codex-tools.md"
     },
     {
       "token": "control-ui",
-      "hint": "Claude Code's `verify` built-in drives UIs; rewrite the sentence, don't token-swap"
+      "hint": "drive UIs with the browser or computer-use tools per codex-tools.md"
     },
     {
       "token": "AskQuestion",
-      "hint": "should have been substituted to AskUserQuestion; substitution rule failed to apply"
+      "hint": "request_user_input per codex-tools.md"
     },
     {
       "token": ".cursor/",
-      "hint": "Cursor config path survived; map it to the Claude Code equivalent"
+      "hint": "Cursor path survived; add a substitution or a codex-tools.md mapping"
     },
     {
       "token": "Cursor cloud agent",
-      "hint": "Claude Code runs subagents locally; the port isolates writers with worktrees"
+      "hint": "Codex runs subagents locally; codex-tools.md maps cloud agents to worktree-isolated local subagents"
     },
     {
       "token": "cursor.com",
-      "hint": "Cursor product URL; check whether the sentence applies to Claude Code at all"
+      "hint": "Cursor product URL; check the sentence still applies"
     },
     {
       "token": "/goal",
-      "hint": "Cursor's /goal has no Claude Code equivalent; the autopilot playbooks keep the objective in standing orders"
+      "hint": "Codex keeps the objective with create_goal or standing orders"
     }
   ]
 }

@@ -2,10 +2,10 @@
 
 import { execFileSync } from "node:child_process";
 import { closeSync, constants, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { MODEL_SLUG_RE } from "./generate.mjs";
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -49,6 +49,13 @@ const FRONTMATTER_POLICY = {
 
 const isSkillFile = (rel) => rel.split("/").at(-1) === "SKILL.md";
 const isPrincipleLeaf = (rel) => /(^|\/)principle-[^/]+\/SKILL\.md$/.test(rel);
+const utf8 = new TextDecoder("utf-8", { fatal: true });
+// Content decides too: a text round trip would corrupt an unlisted binary such as a .wasm.
+function isBinary(rel, bytes) {
+  if (/\.(png|jpg|jpeg|gif|webp|lock)$/.test(rel) || bytes.includes(0)) return true;
+  try { utf8.decode(bytes); return false; } catch { return true; }
+}
+const matches = (rel, rules) => rules.some((rule) => rel.startsWith(rule.pathPrefix));
 
 // A block is one top-level key plus its continuation lines, so folded YAML
 // scalars survive the merge without a YAML parser.
@@ -90,8 +97,6 @@ function listFiles(dir) {
   return out;
 }
 
-export const contentRevision = (bytes) => bytes === null ? null : createHash("sha256").update(bytes).digest("hex");
-
 function localBytes(dir, rel) {
   if (lstatSync(dir).isSymbolicLink()) throw new Error(`symlink is not a sync target: ${dir}`);
   let current = dir;
@@ -104,10 +109,25 @@ function localBytes(dir, rel) {
   return existsSync(current) ? readFileSync(current) : null;
 }
 
-function renderTarget(raw, rel, local, rules) {
-  if (raw === null) return null;
-  if (/\.(png|jpg|jpeg|gif|webp|lock)$/.test(rel)) return raw;
-  const text = applySubstitutions(raw.toString("utf8"), rules).text;
+const ROLE_MODEL = "<role model>";
+const MODEL_SLUGS = new RegExp(MODEL_SLUG_RE.source, "g");
+// Codex reads this file to keep a skill explicit-only, the meaning of
+// Cursor's disable-model-invocation, which the frontmatter merge drops.
+const INVOCATION_POLICY = Buffer.from("policy:\n  allow_implicit_invocation: false\n");
+
+const tally = (counts, key, n) => counts.set(key, (counts.get(key) ?? 0) + n);
+
+function renderTarget(raw, rel, local, rules, counts) {
+  if (isBinary(rel, raw)) return raw;
+  const substituted = applySubstitutions(raw.toString("utf8"), rules);
+  substituted.counts.forEach((n, pattern) => tally(counts, pattern, n));
+  let text = substituted.text;
+  if (rel.endsWith(".md")) {
+    text = text.replace(MODEL_SLUGS, () => {
+      tally(counts, ROLE_MODEL, 1);
+      return ROLE_MODEL;
+    });
+  }
   if (!isSkillFile(rel)) return Buffer.from(text);
   const upstream = splitMarkdown(text);
   if (upstream.frontmatter === null) return Buffer.from(text);
@@ -116,83 +136,62 @@ function renderTarget(raw, rel, local, rules) {
 }
 
 const sameBytes = (a, b) => a === null || b === null ? a === b : a.equals(b);
+const treeBytes = (dir, rel) => existsSync(join(dir, rel)) ? readFileSync(join(dir, rel)) : null;
+const disablesModelInvocation = (raw) => (splitMarkdown(raw.toString("utf8")).frontmatter ?? "").split("\n").includes("disable-model-invocation: true");
 
-export function syncComponent({ oldDir, newDir, localDir, rules, write = false, exclude = [], decisions = [], denylist = [] }) {
-  const report = { candidates: [], planned: [], written: [], manual: [], deferred: [], hits: [], unchanged: 0, excluded: 0, counts: new Map(), pinReady: false };
-  const reviewed = new Map();
-  for (const decision of decisions) {
-    if (reviewed.has(decision.path)) throw new Error(`duplicate review decision: ${decision.path}`);
-    reviewed.set(decision.path, decision);
+function writeTarget(localDir, rel, target) {
+  const exists = localBytes(localDir, rel) !== null;
+  const file = join(localDir, rel);
+  if (target === null) {
+    if (exists) rmSync(file);
+    return;
   }
-  const paths = new Set([...listFiles(oldDir).map((p) => relative(oldDir, p)), ...listFiles(newDir).map((p) => relative(newDir, p))]);
-  const operations = [];
-  for (const rel of [...paths].sort()) {
-    if (exclude.some((rule) => rel.startsWith(rule.pathPrefix))) {
+  mkdirSync(dirname(file), { recursive: true });
+  const fd = openSync(file, constants.O_WRONLY | constants.O_CREAT | constants.O_NOFOLLOW | (exists ? constants.O_TRUNC : constants.O_EXCL));
+  try { writeFileSync(fd, target); } finally { closeSync(fd); }
+}
+
+export function syncComponent({ oldDir, newDir, localDir, rules, apply = false, exclude = [], portOwned = [], remap = [], denylist = [] }) {
+  const report = { changes: [], portOwnedChanged: [], warnings: [], counts: new Map(), unchanged: 0, excluded: 0 };
+  const files = (dir) => listFiles(dir).map((p) => relative(dir, p));
+  const paths = [...new Set([...files(oldDir), ...files(newDir)])].sort();
+  const operations = new Map();
+  const skills = [];
+  for (const rel of paths) {
+    const remapped = remap.find((rule) => rule.from === rel);
+    if (!remapped && matches(rel, exclude)) {
       report.excluded++;
       continue;
     }
-    const oldRaw = existsSync(join(oldDir, rel)) ? readFileSync(join(oldDir, rel)) : null;
-    const newRaw = existsSync(join(newDir, rel)) ? readFileSync(join(newDir, rel)) : null;
+    const localRel = remapped?.to ?? rel;
+    const oldRaw = treeBytes(oldDir, rel);
+    const newRaw = treeBytes(newDir, rel);
+    if (matches(localRel, portOwned)) {
+      if (!sameBytes(oldRaw, newRaw)) report.portOwnedChanged.push(localRel);
+      continue;
+    }
+    if (isSkillFile(localRel)) skills.push({ localRel, newRaw });
     if (sameBytes(oldRaw, newRaw)) {
       report.unchanged++;
       continue;
     }
-    const localFile = join(localDir, rel);
-    const local = localBytes(localDir, rel);
-    const target = renderTarget(newRaw, rel, local, rules);
-    const base = renderTarget(oldRaw, rel, local, rules);
-    const clean = sameBytes(local, base);
-    const aligned = sameBytes(local, target);
-    const kind = oldRaw === null ? "added" : newRaw === null ? "deleted" : "updated";
-    const candidate = { path: rel, kind, revision: contentRevision(newRaw), localRevision: contentRevision(local), disposition: aligned ? "aligned" : clean ? "clean" : "local-edits", decision: null };
-    report.candidates.push(candidate);
-    const decision = reviewed.get(rel);
-    const valid = decision && decision.revision === candidate.revision && typeof decision.reason === "string" && decision.reason.trim() && ["adopt", "adapt", "exclude", "defer"].includes(decision.action);
-    if (!valid) {
-      report.manual.push(rel);
-      continue;
-    }
-    candidate.decision = decision.action;
-    candidate.reason = decision.reason;
-    if (decision.action === "defer") {
-      report.deferred.push(rel);
-      continue;
-    }
-    if (decision.action === "adapt" || decision.action === "exclude") {
-      if (decision.localRevision !== candidate.localRevision) {
-        report.manual.push(rel);
-        continue;
-      }
-      if (decision.action === "adapt" && local !== null) report.hits.push(...denylistHits(rel, local.toString("utf8"), denylist));
-      continue;
-    }
-    if (!clean && !aligned) {
-      report.manual.push(rel);
-      continue;
-    }
-    if (target !== null) report.hits.push(...denylistHits(rel, target.toString("utf8"), denylist));
-    if (!aligned) {
-      report.planned.push(`${kind}: ${rel}`);
-      operations.push({ localFile, target, kind, rel, localRevision: candidate.localRevision });
-      if (newRaw !== null) applySubstitutions(newRaw.toString("utf8"), rules).counts.forEach((n, p) => report.counts.set(p, (report.counts.get(p) ?? 0) + n));
-    }
+    const local = localBytes(localDir, localRel);
+    const target = newRaw === null ? null : renderTarget(newRaw, localRel, local, rules, report.counts);
+    if (target !== null && !isBinary(localRel, target)) report.warnings.push(...denylistHits(localRel, target.toString("utf8"), denylist));
+    operations.set(localRel, { kind: oldRaw === null ? "added" : newRaw === null ? "deleted" : "updated", target });
   }
-  report.pinReady = report.manual.length === 0 && report.deferred.length === 0 && report.hits.length === 0;
-  if (write && report.pinReady) {
-    for (const operation of operations) {
-      if (contentRevision(localBytes(localDir, operation.rel)) !== operation.localRevision) throw new Error(`sync target changed after review: ${operation.rel}`);
-    }
-    for (const { localFile, target, kind, rel, localRevision } of operations) {
-      localBytes(localDir, rel);
-      if (target === null) rmSync(localFile);
-      else {
-        mkdirSync(dirname(localFile), { recursive: true });
-        const flags = constants.O_WRONLY | constants.O_CREAT | constants.O_NOFOLLOW | (localRevision === null ? constants.O_EXCL : constants.O_TRUNC);
-        const fd = openSync(localFile, flags);
-        try { writeFileSync(fd, target); } finally { closeSync(fd); }
-      }
-      report.written.push(`${kind}: ${rel}`);
-    }
+  for (const { localRel, newRaw } of skills) {
+    const policyRel = join(dirname(localRel), "agents/openai.yaml");
+    const skill = operations.get(localRel);
+    const present = skill ? skill.target !== null : localBytes(localDir, localRel) !== null;
+    const desired = present && newRaw !== null && disablesModelInvocation(newRaw) ? INVOCATION_POLICY : null;
+    const local = localBytes(localDir, policyRel);
+    if (sameBytes(local, desired)) continue;
+    operations.set(policyRel, { kind: local === null ? "added" : desired === null ? "deleted" : "updated", target: desired });
+  }
+  for (const [path, { kind, target }] of operations) {
+    report.changes.push({ path, kind });
+    if (apply) writeTarget(localDir, path, target);
   }
   return report;
 }
@@ -204,20 +203,23 @@ function git(args, opts = {}) {
 
 export function parseSyncArgs(args) {
   const [component, sha, ...flags] = args;
-  const options = { component, sha, apply: false, finalize: false, json: false, review: null, source: null };
+  const options = { component, sha, apply: false, full: false, json: false, source: null };
   for (let i = 0; i < flags.length; i++) {
     const flag = flags[i];
-    if (flag === "--apply") options.apply = true;
-    else if (flag === "--finalize") { options.finalize = true; options.apply = true; }
-    else if (flag === "--json") options.json = true;
-    else if (flag === "--review" || flag === "--source") {
+    if (flag === "--apply" || flag === "--full" || flag === "--json") options[flag.slice(2)] = true;
+    else if (flag === "--source") {
       const value = flags[++i];
-      if (!value || value.startsWith("--")) throw new Error(`${flag} requires a path`);
-      options[flag.slice(2)] = value;
+      if (!value || value.startsWith("--")) throw new Error("--source requires a path");
+      options.source = value;
     } else throw new Error(`unknown option: ${flag}`);
   }
-  if (!component || !sha?.match(/^[0-9a-f]{7,40}$/)) throw new Error("usage: bun tools/sync.mjs <component> <sha> [--json] [--review path] [--apply|--finalize] [--source git-checkout]");
+  if (!component || !sha?.match(/^[0-9a-f]{7,40}$/)) throw new Error("usage: bun tools/sync.mjs <component> <sha> [--json] [--apply] [--full] [--source <git-checkout>]");
   return options;
+}
+
+function pluginVersion(dir) {
+  const manifest = join(dir, ".cursor-plugin/plugin.json");
+  return existsSync(manifest) ? JSON.parse(readFileSync(manifest, "utf8")).version ?? null : null;
 }
 
 export function main(args = process.argv.slice(2), repository = repo) {
@@ -242,57 +244,57 @@ export function main(args = process.argv.slice(2), repository = repo) {
     };
     const oldDir = co(from, join(scratch, "old"));
     const newSha = git(["-C", clone, "rev-parse", `${options.sha}^{commit}`]).trim();
-    if (options.finalize && options.source) {
-      const registered = join(scratch, "registered");
-      git(["init", "--bare", "--quiet", registered]);
-      try { git(["-C", registered, "fetch", "--quiet", "--depth=1", upstream.remote, newSha]); }
-      catch (error) { throw new Error(`target cannot be verified against registered upstream: ${error.message}`); }
-    }
     const newDir = co(newSha, join(scratch, "new"));
-    let decisions = [];
-    let reviewMismatch = false;
-    const reviewPath = options.review ?? (spec.review ? join(repository, spec.review) : null);
-    if (reviewPath && existsSync(reviewPath)) {
-      const document = JSON.parse(readFileSync(reviewPath, "utf8"));
-      const review = document.components?.[component];
-      if (review?.from === from && review?.to === newSha) decisions = review.decisions;
-      else reviewMismatch = true;
-    }
+    const empty = join(scratch, "empty");
+    mkdirSync(empty);
 
     const report = syncComponent({
-      oldDir,
+      oldDir: options.full ? empty : oldDir,
       newDir,
       localDir: join(repository, spec.localPath),
       rules: substitutions,
-      write: options.apply,
+      apply: options.apply,
       exclude: spec.exclude ?? [],
-      decisions,
+      portOwned: spec.portOwned ?? [],
+      remap: spec.remap ?? [],
       denylist,
     });
-    if (options.apply && reviewMismatch && report.candidates.length) throw new Error(`review revisions do not match ${component}: ${from} -> ${newSha}`);
-    let pinAdvanced = false;
-    if (options.finalize && report.pinReady && from !== newSha) {
-      for (const [command, commandArgs] of [["bun", ["tools/generate.mjs"]], ["bash", ["tests/skill-collision-repro.sh"]], ["bun", ["test", "tests/"]]]) {
-        execFileSync(command, commandArgs, { cwd: repository, stdio: ["ignore", "pipe", "pipe"] });
-      }
+    const status = report.changes.length || report.portOwnedChanged.length ? "changed" : "current";
+    const pinAdvanced = options.apply && status === "changed" && from !== newSha;
+    if (pinAdvanced) {
       upstream.components[component].sha = newSha;
       writeFileSync(upstreamPath, JSON.stringify(upstream, null, 2) + "\n");
-      pinAdvanced = true;
     }
-    const result = { component, from, to: newSha, status: report.pinReady ? "reviewed" : "needs-review", ...report, counts: Object.fromEntries(report.counts), pinAdvanced };
+    const result = {
+      component,
+      from,
+      to: newSha,
+      fromVersion: pluginVersion(oldDir),
+      toVersion: pluginVersion(newDir),
+      status,
+      changes: report.changes,
+      portOwnedChanged: report.portOwnedChanged,
+      warnings: report.warnings,
+      counts: Object.fromEntries(report.counts),
+      unchanged: report.unchanged,
+      excluded: report.excluded,
+      applied: options.apply,
+      pinAdvanced,
+    };
     if (options.json) console.log(JSON.stringify(result, null, 2));
     else {
-      console.log(`${component}: ${result.status}; ${report.candidates.length} upstream changes; pin ${pinAdvanced ? "advanced" : "held"}`);
-      for (const candidate of report.candidates) console.log(`${candidate.kind}: ${candidate.path} (${candidate.decision ?? "unreviewed"}, ${candidate.disposition})`);
-      for (const hit of report.hits) console.error(hit);
+      const kinds = ["added", "updated", "deleted"].map((kind) => `${report.changes.filter((c) => c.kind === kind).length} ${kind}`);
+      console.log(`${component}: ${status} ${from.slice(0, 7)} -> ${newSha.slice(0, 7)}; ${kinds.join(", ")}; pin ${pinAdvanced ? "advanced" : "held"}`);
+      for (const path of report.portOwnedChanged) console.log(`port-owned, changed upstream: ${path}`);
+      for (const warning of report.warnings) console.log(`warning: ${warning}`);
     }
-    return { result, exitCode: report.hits.length ? 1 : options.apply && !report.pinReady ? 2 : 0 };
+    return result;
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  try { process.exitCode = main().exitCode; }
+  try { main(); }
   catch (error) { console.error(`FAIL: ${error.message}`); process.exitCode = 1; }
 }

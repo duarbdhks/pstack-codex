@@ -1,8 +1,8 @@
 # pstack for Codex
 
-pstack-codex turns [poteto's pstack](https://github.com/cursor/plugins/tree/main/pstack) into a Codex engineering workflow. Shared principles and playbooks stay comparable with upstream. This repository owns Codex model routing, subagent execution, tool selection, verification, and release checks.
+pstack-codex mirrors [poteto's pstack](https://github.com/cursor/plugins/tree/main/pstack) for Codex. Upstream skills, playbooks, principles, and scripts are copied as published, including additions and deletions. This repository owns only the Codex and OpenCodex model routing and the Codex runtime contract. Both live in port-owned files and generator-stamped sections.
 
-The 0.10.0 changes selectively absorb upstream pstack 0.15.9 at `e43c7ee`. [The comparison and adoption record](docs/changes/0.10.0/README.md) explains the choices. [tools/upstream.json](tools/upstream.json) records the last fully reviewed revision; reviewing a newer revision does not mean copying every feature.
+[tools/upstream.json](tools/upstream.json) records the mirrored upstream revision, the Cursor-only exclusions, and the port-owned paths.
 
 ## Install on Codex
 
@@ -16,11 +16,13 @@ codex plugin list --json
 
 For a local checkout, pass its path to `codex plugin marketplace add` instead. Confirm the installed version in `codex plugin list`. Installing or refreshing a plugin does not update an already loaded chat's instructions; start a new chat to use the new version.
 
+Each landed upstream change is a new patch version on `main`. Refresh an installed copy with `codex plugin marketplace upgrade pstack-codex`.
+
 Independent copies of the skill directories also work with `.agents/skills` discovery. The routing catalog is generated into the `poteto-mode/scripts` directory so a copied skill does not depend on a checkout above it. Refresh copies deliberately; they do not follow Git automatically.
 
 ## Start a task
 
-Use `pstack:poteto-mode` for a concrete task and give it an observable finish condition. It chooses a playbook, grounds the affected code, assigns bounded work, and checks the actual result. A CLI change runs the command; a UI change drives the affected flow; a storage change reads the result back.
+Invoke `$pstack:poteto-mode` for a concrete task and give it an observable finish condition. Like upstream, pstack skills run only when invoked; they are not injected into every chat. It chooses a playbook, grounds the affected code, assigns bounded work, and checks the actual result. A CLI change runs the command; a UI change drives the affected flow; a storage change reads the result back.
 
 Use `/setup-pstack` to inspect or change your role selections. Existing fixed pairs and OCX selections keep their meaning. Adaptive routing is a choice for specific roles. It requires a compatible policy and does not silently rewrite your global instructions or change OpenCodex.
 
@@ -36,25 +38,26 @@ Shared skills may retain upstream names for tools. [Legacy tool mappings](plugin
 
 Fresh children handle independent tasks and new fix rounds. A child is reused when its live process, checkout, or unrecovered edits are needed to continue the same task. Preserve that work before replacing it.
 
-## Upstream review
+## Upstream mirror
 
-The scheduled workflow reports candidate changes and uploads JSON artifacts. It has read-only repository permissions and does not push or merge.
+The scheduled workflow runs every six hours. It mirrors each upstream change, bumps the patch version, regenerates the stamped sections, and runs the release checks. A clean run opens and squash-merges a sync PR. An upstream change to a port-owned file waits for a manual merge. A run that cannot land opens or updates one issue titled "Upstream sync needs attention". The next landed or current run closes it.
 
 ```shell
 bun tools/sync.mjs pstack <upstream-sha> --json
+bun tools/sync.mjs pstack <upstream-sha> --apply
 ```
 
-Each changed path needs a revision-bound decision to adopt, adapt, exclude, or defer it. `--apply` writes only a fully reviewed batch. `--finalize` also runs the core release checks before advancing the pin. New files and deletions need decisions too. A local adaptation is checked against its reviewed content hash. Unresolved changes, stale decisions, denylist hits, or failed checks hold the pin. See [CONTRIBUTING.md](CONTRIBUTING.md) for the review document and commands.
+Preview is the default. `--apply` writes the mirror and advances the pin. Port-owned paths are never written; upstream edits to them are listed under `portOwnedChanged` for a manual look. Upstream model names in prose become `<role model>`. Upstream `disable-model-invocation` becomes `agents/openai.yaml` with implicit invocation off. See [CONTRIBUTING.md](CONTRIBUTING.md) for the ownership rules.
 
 ## Maintenance
 
 - `VERSION` owns the release version. `CHANGES.md` explains each release.
 - `plugins/pstack/models.json` owns model metadata, role names, and adaptive profiles. `tools/generate.mjs` produces the bundled catalog and model documentation from it.
 - Public skill frontmatter owns Codex prompt descriptions and the command table below.
-- `tests/` checks routing, reviewed sync, generation, and plugin invariants with positive and negative fixtures.
+- `tests/` checks routing, mirror sync, generation, and plugin invariants with positive and negative fixtures.
 - `poteto-mode/scripts/` ships the resolver, PR watcher, orchestration store, and worktree audit. Existing script dependencies stay pinned by `bun.lock`.
 
-CI checks generated files, plugin invariants, Bun tests, vendored TypeScript tools, shell scripts, pinned actions, and workflow security. The scheduled upstream review is separate from release CI.
+CI checks generated files, mirror parity with the pinned upstream, plugin invariants, Bun tests, vendored TypeScript tools, shell scripts, pinned actions, and workflow security. The scheduled upstream mirror is separate from release CI.
 
 ## Slash commands
 
@@ -93,6 +96,12 @@ CI checks generated files, plugin invariants, Bun tests, vendored TypeScript too
 | `/fix-merge-conflicts` | non-interactively resolve merge conflicts, validate, finalize |
 | `/get-pr-comments` | fetch and summarize review comments from the active PR |
 | `/what-did-i-get-done` | summarize authored commits over a user-chosen period |
+| `/create-formal-verification-skill` | Generate a project-local skill that formally verifies the code where a bug costs the most and tests reach the least, in any language, with whichever verification tool fits |
+| `/in-your-own-words` | Restate in your own words what you think the user's goals are and what problem they're trying to solve |
+| `/ketchup` | Catch the user up on what changed in this chat since their last message, in plain words and small visuals |
+| `/maintain-formal-verification-skill` | Bring a project's formal verification back in line with the code after the code changes: find the commits that touched verified code, update the model, harness, or properties to describe the code as it is now, rerun, and say whether each failure is drift in the verification or a bug in the code |
+| `/poteto-help` | Guides users through pstack setup, /poteto-mode, and picking the skill, playbook, or principle for a task |
+| `/sharpen` | Sharpen a task before starting: the expert approach, what the user is really after, and the right level of specification |
 
 ## License
 

@@ -42,7 +42,7 @@ Give each piece of state one owner. Other modules read it or ask the owner to ch
 
 The design supports more than one way to do the same task. An agent copies whichever way it finds first, so every way keeps gaining callers.
 
-Keep one way. Move callers off the others and delete them in the same change. Do not keep an old way alive as a wrapper that forwards to the new one; that is a new pass-through method.
+Keep one way. Move callers off the others and delete them in the same change.
 
 ## Importable internals
 

@@ -1,7 +1,7 @@
 {
   "name": "pstack",
-  "version": "0.10.0",
-  "description": "Codex engineering workflows with explicit model and effort routing, repeatable verification, and selective upstream improvements.",
+  "version": "0.11.0",
+  "description": "Upstream pstack mirrored for Codex, with explicit model and effort routing and repeatable verification.",
   "author": {
     "name": "Lauren Tan"
   },

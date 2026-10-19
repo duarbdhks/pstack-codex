@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createHash } from "node:crypto";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { applySubstitutions, denylistHits, main, parseSyncArgs, syncComponent } from "../tools/sync.mjs";
 
 const RULES = JSON.parse(readFileSync(join(import.meta.dir, "../tools/substitutions.json"), "utf8"));
+const POLICY = "policy:\n  allow_implicit_invocation: false\n";
 
 function tree(files) {
   const dir = mkdtempSync(join(tmpdir(), "sync-fixture-"));
@@ -17,304 +17,223 @@ function tree(files) {
   return dir;
 }
 
-const revision = (text) => createHash("sha256").update(text).digest("hex");
-const adopt = (dir, paths) => paths.map((path) => ({ path, revision: revision(readFileSync(join(dir, path))), action: "adopt", reason: "reviewed fixture" }));
+// One upstream git repository with a commit per snapshot of its pstack/ tree.
+function upstreamRepo(...snapshots) {
+  const source = tree({});
+  const git = (...args) => execFileSync("git", ["-C", source, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  git("init", "-q");
+  const shas = snapshots.map((files) => {
+    rmSync(join(source, "pstack"), { recursive: true, force: true });
+    for (const [rel, text] of Object.entries(files)) {
+      mkdirSync(join(source, "pstack", rel, ".."), { recursive: true });
+      writeFileSync(join(source, "pstack", rel), text);
+    }
+    git("add", "-A");
+    git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "commit", "-q", "--allow-empty", "-m", "fixture");
+    return git("rev-parse", "HEAD");
+  });
+  return { source, shas };
+}
 
-describe("reviewed sync safety", () => {
-  test("unchanged upstream preserves local edits without a false conflict", () => {
-    const oldDir = tree({ "a.md": "upstream\n" });
-    const newDir = tree({ "a.md": "upstream\n" });
-    const localDir = tree({ "a.md": "Codex adaptation\n" });
-    const result = syncComponent({ oldDir, newDir, localDir, rules: [], write: false });
-    expect(result.manual).toEqual([]);
-    expect(result.candidates).toEqual([]);
-    expect(readFileSync(join(localDir, "a.md"), "utf8")).toBe("Codex adaptation\n");
+function portRepo({ sha, local, denylist = [], extra = {} }) {
+  const component = {
+    upstreamPath: "pstack",
+    localPath: "plugin",
+    sha,
+    exclude: [{ pathPrefix: "agents/", reason: "fixture" }, { pathPrefix: ".cursor-plugin/", reason: "fixture" }],
+    portOwned: [{ pathPrefix: "models.json", reason: "fixture" }],
+    remap: [{ from: "agents/comment-sicko.md", to: "skills/no-comments/references/comment-sicko.md" }],
+  };
+  const files = Object.fromEntries(Object.entries(local).map(([rel, text]) => [join("plugin", rel), text]));
+  return tree({
+    "tools/upstream.json": JSON.stringify({ remote: "unused", components: { pstack: component } }),
+    "tools/substitutions.json": JSON.stringify({ substitutions: RULES.substitutions, denylist }),
+    ...files,
+    ...extra,
+  });
+}
+
+const read = (dir, rel) => readFileSync(join(dir, rel), "utf8");
+const pin = (repository) => JSON.parse(read(repository, "tools/upstream.json")).components.pstack.sha;
+
+const OLD = {
+  ".cursor-plugin/plugin.json": '{"version": "0.15.9"}\n',
+  "models.json": '{"v": 1}\n',
+  "notes.md": "same\n",
+  "skills/a/SKILL.md": "---\nname: a\ndescription: a\n---\n\nOld a.\n",
+  "skills/c/SKILL.md": "---\nname: c\ndescription: c\n---\n\nC body.\n",
+  "skills/gone/SKILL.md": "---\nname: gone\ndescription: gone\ndisable-model-invocation: true\n---\n\nGone.\n",
+};
+const NEW = {
+  ".cursor-plugin/plugin.json": '{"version": "0.15.27"}\n',
+  "agents/comment-sicko.md": "Run on grok-4.7-xhigh-fast.\n",
+  "agents/poteto-agent.md": "excluded\n",
+  "models.json": '{"v": 2}\n',
+  "notes.md": "same\n",
+  "scripts/x.ts": 'const m = "grok-4.7-xhigh-fast";\n',
+  "skills/a/SKILL.md": "---\nname: a\ndescription: a\ndisable-model-invocation: true\n---\n\nNew a on claude-opus-5-5-xhigh. Read ~/.cursor/rules/pstack-models.mdc.\n",
+  "skills/b/SKILL.md": "---\nname: b\ndescription: b\n---\n\nB body.\n",
+  "skills/c/SKILL.md": "---\nname: c\ndescription: c\n---\n\nC body.\n",
+};
+const LOCAL = {
+  "models.json": '{"port": true}\n',
+  "notes.md": "local drift\n",
+  "skills/a/SKILL.md": "---\nname: a\ndescription: a\nmenu-description: port menu\n---\n\nPort edit of a.\n",
+  "skills/c/SKILL.md": "---\nname: c\ndescription: c\n---\n\nC body.\n",
+  "skills/c/agents/openai.yaml": POLICY,
+  "skills/gone/SKILL.md": "---\nname: gone\ndescription: gone\n---\n\nGone.\n",
+  "skills/gone/agents/openai.yaml": POLICY,
+};
+
+describe("mirror sync", () => {
+  test("preview holds the tree and pin; apply mirrors upstream, keeps port-owned files, and derives invocation policy", () => {
+    const { source, shas: [from, to] } = upstreamRepo(OLD, NEW);
+    const repository = portRepo({ sha: from, local: LOCAL });
+    const local = join(repository, "plugin");
+
+    const preview = main(["pstack", to, "--source", source], repository);
+    expect(preview).toMatchObject({ status: "changed", applied: false, pinAdvanced: false });
+    expect(pin(repository)).toBe(from);
+    expect(read(local, "skills/a/SKILL.md")).toBe(LOCAL["skills/a/SKILL.md"]);
+
+    const applied = main(["pstack", to, "--source", source, "--apply"], repository);
+    expect(applied).toEqual({
+      component: "pstack",
+      from,
+      to,
+      fromVersion: "0.15.9",
+      toVersion: "0.15.27",
+      status: "changed",
+      changes: [
+        { path: "skills/no-comments/references/comment-sicko.md", kind: "added" },
+        { path: "scripts/x.ts", kind: "added" },
+        { path: "skills/a/SKILL.md", kind: "updated" },
+        { path: "skills/b/SKILL.md", kind: "added" },
+        { path: "skills/gone/SKILL.md", kind: "deleted" },
+        { path: "skills/a/agents/openai.yaml", kind: "added" },
+        { path: "skills/c/agents/openai.yaml", kind: "deleted" },
+        { path: "skills/gone/agents/openai.yaml", kind: "deleted" },
+      ],
+      portOwnedChanged: ["models.json"],
+      warnings: [],
+      counts: { "~/.cursor/rules/pstack-models.mdc": 1, "<role model>": 2 },
+      unchanged: 2,
+      excluded: 2,
+      applied: true,
+      pinAdvanced: true,
+    });
+    expect(pin(repository)).toBe(to);
+    expect(read(local, "skills/a/SKILL.md")).toBe("---\nname: a\ndescription: a\nmenu-description: port menu\n---\n\nNew a on <role model>. Read ~/.codex/pstack-models.md.\n");
+    expect(read(local, "skills/a/agents/openai.yaml")).toBe(POLICY);
+    expect(read(local, "skills/no-comments/references/comment-sicko.md")).toBe("Run on <role model>.\n");
+    expect(read(local, "scripts/x.ts")).toBe('const m = "grok-4.7-xhigh-fast";\n');
+    expect(read(local, "models.json")).toBe('{"port": true}\n');
+    expect(read(local, "notes.md")).toBe("local drift\n");
+    expect(["skills/gone/SKILL.md", "skills/gone/agents/openai.yaml", "skills/c/agents/openai.yaml", "agents/poteto-agent.md"].filter((rel) => existsSync(join(local, rel)))).toEqual([]);
+
+    expect(main(["pstack", to, "--source", source, "--apply"], repository)).toMatchObject({ status: "current", changes: [], pinAdvanced: false });
+
+    const full = main(["pstack", to, "--source", source, "--full", "--apply"], repository);
+    expect(full.changes).toEqual([
+      { path: "skills/no-comments/references/comment-sicko.md", kind: "added" },
+      { path: "notes.md", kind: "added" },
+      { path: "scripts/x.ts", kind: "added" },
+      { path: "skills/a/SKILL.md", kind: "added" },
+      { path: "skills/b/SKILL.md", kind: "added" },
+      { path: "skills/c/SKILL.md", kind: "added" },
+    ]);
+    expect(full).toMatchObject({ status: "changed", portOwnedChanged: ["models.json"], pinAdvanced: false });
+    expect(read(local, "notes.md")).toBe("same\n");
+    expect(pin(repository)).toBe(to);
   });
 
-  test("new files remain candidates until adopted", () => {
-    const localDir = tree({});
-    const result = syncComponent({ oldDir: tree({}), newDir: tree({ "a.md": "new\n" }), localDir, rules: [], write: true });
-    expect(existsSync(join(localDir, "a.md"))).toBe(false);
-    expect(result.pinReady).toBe(false);
-    expect(result.manual).toEqual(["a.md"]);
+  test("a rendered denylist hit is a warning, not a failure, at the CLI", () => {
+    const { source, shas: [from, to] } = upstreamRepo({ "notes.md": "same\n" }, { "notes.md": "same\n", "skills/a/SKILL.md": "---\nname: a\ndescription: a\n---\n\nUse control-ui.\n" });
+    const repository = portRepo({ sha: from, local: { "notes.md": "same\n" }, denylist: [{ token: "control-ui", hint: "use a Codex driver" }] });
+    const real = join(import.meta.dir, "..");
+    for (const rel of ["tools/sync.mjs", "tools/generate.mjs", "plugins/pstack/skills/poteto-mode/scripts/route.mjs"]) {
+      mkdirSync(join(repository, rel, ".."), { recursive: true });
+      copyFileSync(join(real, rel), join(repository, rel));
+    }
+    const cli = (...args) => spawnSync(process.execPath, [join(repository, "tools/sync.mjs"), ...args], { encoding: "utf8" });
+
+    const ok = cli("pstack", to, "--source", source, "--apply", "--json");
+    expect(ok.status).toBe(0);
+    expect(JSON.parse(ok.stdout).warnings).toEqual(['skills/a/SKILL.md:6: "control-ui" — use a Codex driver']);
+    expect(read(repository, "plugin/skills/a/SKILL.md")).toBe("---\nname: a\ndescription: a\n---\n\nUse control-ui.\n");
+
+    const failed = cli("missing", to, "--source", source);
+    expect(failed.status).toBe(1);
+    expect(failed.stderr).toBe("FAIL: unknown component: missing\n");
   });
 
-  test("an adopted addition cannot follow a dangling symlink outside the target", () => {
+  test("a sync target behind a symlink is rejected before anything is written", () => {
     const localDir = tree({});
     const outside = join(tree({}), "outside.md");
     symlinkSync(outside, join(localDir, "a.md"));
-    expect(() => syncComponent({ oldDir: tree({}), newDir: tree({ "a.md": "new\n" }), localDir, rules: [], write: true,
-      decisions: [{ path: "a.md", revision: revision("new\n"), action: "adopt", reason: "reviewed" }] })).toThrow("symlink");
+    expect(() => syncComponent({ oldDir: tree({}), newDir: tree({ "a.md": "new\n", "b.md": "b\n" }), localDir, rules: [], apply: true })).toThrow("symlink is not a sync target");
     expect(existsSync(outside)).toBe(false);
+    expect(existsSync(join(localDir, "b.md"))).toBe(false);
   });
 
-  test("a changed source invalidates an old adoption decision", () => {
+  test("a new principle leaf lands with user-invocable: false and no Cursor flags", () => {
     const localDir = tree({});
-    const result = syncComponent({ oldDir: tree({}), newDir: tree({ "a.md": "newer\n" }), localDir, rules: [], write: true,
-      decisions: [{ path: "a.md", revision: revision("new\n"), action: "adopt", reason: "reviewed" }] });
-    expect(result.pinReady).toBe(false);
-    expect(existsSync(join(localDir, "a.md"))).toBe(false);
+    syncComponent({
+      oldDir: tree({}),
+      newDir: tree({ "skills/principle-x/SKILL.md": "---\nname: principle-x\ndescription: a fresh principle\ndisable-model-invocation: true\n---\n\nPrinciple body.\n" }),
+      localDir,
+      rules: [],
+      apply: true,
+    });
+    expect(read(localDir, "skills/principle-x/SKILL.md")).toBe("---\nname: principle-x\ndescription: a fresh principle\nuser-invocable: false\n---\n\nPrinciple body.\n");
   });
 
-  test("a deferred candidate prevents writes and pin advancement for the batch", () => {
+  test.each([
+    ["scripts/engine.wasm", Buffer.from([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00])],
+    ["scripts/blob.dat", Buffer.from([0xff, 0xfe, 0x80])],
+  ])("%s with an unlisted extension passes through byte for byte", (rel, header) => {
+    const payload = Buffer.concat([header, Buffer.from(" ~/.cursor/skills/ control-cli\n")]);
     const localDir = tree({});
-    const result = syncComponent({ oldDir: tree({}), newDir: tree({ "a.md": "a\n", "b.md": "b\n" }), localDir, rules: [], write: true,
-      decisions: [
-        { path: "a.md", revision: revision("a\n"), action: "adopt", reason: "useful" },
-        { path: "b.md", revision: revision("b\n"), action: "defer", reason: "needs design" },
-      ] });
-    expect(result.pinReady).toBe(false);
-    expect(result.deferred).toEqual(["b.md"]);
-    expect(existsSync(join(localDir, "a.md"))).toBe(false);
-  });
-
-  test("reviewed adaptations require the reviewed local content", () => {
-    const localDir = tree({ "a.md": "native contract\n" });
-    const args = { oldDir: tree({ "a.md": "old\n" }), newDir: tree({ "a.md": "new\n" }), localDir, rules: [], write: true,
-      decisions: [{ path: "a.md", revision: revision("new\n"), localRevision: revision("native contract\n"), action: "adapt", reason: "Codex execution" }] };
-    expect(syncComponent(args).pinReady).toBe(true);
-    writeFileSync(join(localDir, "a.md"), "unreviewed edit\n");
-    expect(syncComponent(args).pinReady).toBe(false);
-    expect(readFileSync(join(localDir, "a.md"), "utf8")).toBe("unreviewed edit\n");
-  });
-
-  test("upstream deletion is reported and requires an explicit decision", () => {
-    const localDir = tree({ "a.md": "old\n" });
-    const args = { oldDir: tree({ "a.md": "old\n" }), newDir: tree({}), localDir, rules: [], write: true };
-    const preview = syncComponent(args);
-    expect(preview.candidates[0].kind).toBe("deleted");
-    expect(existsSync(join(localDir, "a.md"))).toBe(true);
-    const result = syncComponent({ ...args, decisions: [{ path: "a.md", revision: null, action: "adopt", reason: "retired upstream" }] });
-    expect(result.pinReady).toBe(true);
-    expect(existsSync(join(localDir, "a.md"))).toBe(false);
-  });
-
-  test("denied content prevents every planned write", () => {
-    const localDir = tree({});
-    const result = syncComponent({ oldDir: tree({}), newDir: tree({ "a.md": "safe\n", "b.md": "control-ui\n" }), localDir, rules: [], write: true,
-      denylist: [{ token: "control-ui", hint: "select a native driver" }],
-      decisions: [
-        { path: "a.md", revision: revision("safe\n"), action: "adopt", reason: "reviewed" },
-        { path: "b.md", revision: revision("control-ui\n"), action: "adopt", reason: "reviewed" },
-      ] });
-    expect(result.pinReady).toBe(false);
-    expect(result.hits).toHaveLength(1);
-    expect(existsSync(join(localDir, "a.md"))).toBe(false);
+    const report = syncComponent({ oldDir: tree({}), newDir: tree({ [rel]: payload }), localDir, rules: RULES.substitutions, apply: true, denylist: RULES.denylist });
+    expect(readFileSync(join(localDir, rel))).toEqual(payload);
+    expect(report).toMatchObject({ changes: [{ path: rel, kind: "added" }], warnings: [] });
+    expect(report.counts.size).toBe(0);
   });
 });
 
 describe("applySubstitutions", () => {
-  test("rewrites Cursor primitives and counts per rule", () => {
+  test("rewrites Cursor paths to Codex paths and counts per rule", () => {
     const { text, counts } = applySubstitutions(
-      "Use the `Task` tool, then AskQuestion. Skills live in .cursor/skills/.",
+      "Rules in ~/.cursor/rules/pstack-models.mdc. Skills in ~/.cursor/skills/ and .cursor/skills/. Plugins in ~/.cursor/plugins/pstack.",
       RULES.substitutions,
     );
-    expect(text).toBe("Use the `Agent` tool, then AskUserQuestion. Skills live in .claude/skills/.");
-    expect(counts.get("AskQuestion")).toBe(1);
-  });
-
-  test("leaves AskUserQuestion alone", () => {
-    const { text } = applySubstitutions("Prefer AskUserQuestion here.", RULES.substitutions);
-    expect(text).toBe("Prefer AskUserQuestion here.");
+    expect(text).toBe("Rules in ~/.codex/pstack-models.md. Skills in ~/.agents/skills/ and .agents/skills/. Plugins in ~/.codex/plugins/cache/pstack.");
+    expect(Object.fromEntries(counts)).toEqual({
+      "~/.cursor/rules/pstack-models.mdc": 1,
+      "~/.cursor/skills/": 1,
+      ".cursor/skills/": 1,
+      "~/.cursor/plugins/": 1,
+    });
   });
 });
 
 describe("denylistHits", () => {
   test("flags residual Cursor-isms with file, line, and hint", () => {
-    const hits = denylistHits("skills/x/SKILL.md", "line one\nrun control-cli now\n", RULES.denylist);
-    expect(hits).toHaveLength(1);
-    expect(hits[0]).toContain("skills/x/SKILL.md:2");
-    expect(hits[0]).toContain("control-cli");
+    expect(denylistHits("skills/x/SKILL.md", "line one\nrun control-cli now\n", RULES.denylist)).toEqual([
+      'skills/x/SKILL.md:2: "control-cli" — drive CLIs/TUIs with exec_command PTY sessions per codex-tools.md',
+    ]);
   });
 });
 
-describe("syncComponent", () => {
-  test("clean update, new file, and port-edited file each route correctly", () => {
-    const oldUp = tree({
-      "skills/a/SKILL.md": "Step 1: AskQuestion about scope.\n",
-      "skills/b/SKILL.md": "Old b body.\n",
-    });
-    const newUp = tree({
-      "skills/a/SKILL.md": "Step 1: AskQuestion about scope. Step 2: verify.\n",
-      "skills/b/SKILL.md": "New b body.\n",
-      "skills/c/SKILL.md": "Brand new skill. AskQuestion early.\n",
-    });
-    const local = tree({
-      // a matches substituted old upstream -> clean update expected
-      "skills/a/SKILL.md": "Step 1: AskUserQuestion about scope.\n",
-      // b carries a port-specific edit -> manual merge expected
-      "skills/b/SKILL.md": "Old b body, plus a Platform note the port added.\n",
-    });
-
-    const report = syncComponent({ oldDir: oldUp, newDir: newUp, localDir: local, rules: RULES.substitutions, write: true,
-      decisions: adopt(newUp, ["skills/a/SKILL.md", "skills/c/SKILL.md"]) });
-
-    expect(report.planned).toEqual(["updated: skills/a/SKILL.md", "added: skills/c/SKILL.md"]);
-    expect(report.written).toEqual([]);
-    expect(report.manual).toEqual(["skills/b/SKILL.md"]);
-    expect(readFileSync(join(local, "skills/a/SKILL.md"), "utf8")).toBe(
-      "Step 1: AskUserQuestion about scope.\n",
-    );
-    expect(existsSync(join(local, "skills/c/SKILL.md"))).toBe(false);
-    expect(readFileSync(join(local, "skills/b/SKILL.md"), "utf8")).toBe(
-      "Old b body, plus a Platform note the port added.\n",
-    );
-  });
-
-  test("excluded prefixes are never written, even as new files", () => {
-    const newUp = tree({
-      "assets/logo.png": "png bytes\n",
-      "README.md": "upstream readme\n",
-      "skills/keep/SKILL.md": "---\nname: keep\ndescription: kept skill\n---\n\nKept body.\n",
-    });
-    const local = tree({});
-    const report = syncComponent({
-      oldDir: tree({}),
-      newDir: newUp,
-      localDir: local,
-      rules: RULES.substitutions,
-      write: true,
-      decisions: adopt(newUp, ["skills/keep/SKILL.md"]),
-      exclude: [
-        { pathPrefix: "assets/", reason: "not ported" },
-        { pathPrefix: "README.md", reason: "port-owned" },
-      ],
-    });
-    expect(report.excluded).toBe(2);
-    expect(report.written).toEqual(["added: skills/keep/SKILL.md"]);
-    expect(existsSync(join(local, "README.md"))).toBe(false);
-    expect(existsSync(join(local, "assets/logo.png"))).toBe(false);
-  });
-
-  test("body-only local drift is clean: new body lands under merged frontmatter", () => {
-    const oldUp = tree({
-      "skills/a/SKILL.md":
-        "---\nname: a\ndescription: old words\ndisable-model-invocation: true\nmode: true\nicon: crown\n---\n\nShared body. AskQuestion early.\n",
-    });
-    const newUp = tree({
-      "skills/a/SKILL.md":
-        "---\nname: a\ndescription: new words\ndisable-model-invocation: true\nmode: true\nicon: crown\ncolor: yellow\n---\n\nShared body. AskQuestion early. New paragraph.\n",
-    });
-    const local = tree({
-      "skills/a/SKILL.md":
-        "---\nname: a\ndescription: old words\nmenu-description: port menu line\n---\n\nShared body. AskUserQuestion early.\n",
-    });
-    const args = { oldDir: oldUp, newDir: newUp, localDir: local, rules: RULES.substitutions, write: true,
-      decisions: adopt(newUp, ["skills/a/SKILL.md"]) };
-
-    const report = syncComponent(args);
-
-    expect(report.manual).toEqual([]);
-    expect(report.written).toEqual(["updated: skills/a/SKILL.md"]);
-    expect(readFileSync(join(local, "skills/a/SKILL.md"), "utf8")).toBe(
-      "---\nname: a\ndescription: new words\nmenu-description: port menu line\n---\n\nShared body. AskUserQuestion early. New paragraph.\n",
-    );
-
-    const rerun = syncComponent(args);
-    expect(rerun.written).toEqual([]);
-    expect(rerun.candidates[0].disposition).toBe("aligned");
-  });
-
-  test("a new principle leaf lands with user-invocable: false and no Cursor flags", () => {
-    const newUp = tree({
-      "skills/principle-x/SKILL.md":
-        "---\nname: principle-x\ndescription: a fresh principle\ndisable-model-invocation: true\n---\n\nPrinciple body.\n",
-    });
-    const local = tree({});
-    const report = syncComponent({
-      oldDir: tree({}),
-      newDir: newUp,
-      localDir: local,
-      rules: RULES.substitutions,
-      write: true,
-      decisions: adopt(newUp, ["skills/principle-x/SKILL.md"]),
-    });
-    expect(report.written).toEqual(["added: skills/principle-x/SKILL.md"]);
-    expect(readFileSync(join(local, "skills/principle-x/SKILL.md"), "utf8")).toBe(
-      "---\nname: principle-x\ndescription: a fresh principle\nuser-invocable: false\n---\n\nPrinciple body.\n",
-    );
-  });
-
-  test("write: false reports without touching the tree", () => {
-    const oldUp = tree({ "s.md": "one\n" });
-    const newUp = tree({ "s.md": "two\n" });
-    const local = tree({ "s.md": "one\n" });
-    const report = syncComponent({ oldDir: oldUp, newDir: newUp, localDir: local, rules: RULES.substitutions, write: false,
-      decisions: adopt(newUp, ["s.md"]) });
-    expect(report.planned).toEqual(["updated: s.md"]);
-    expect(report.written).toEqual([]);
-    expect(readFileSync(join(local, "s.md"), "utf8")).toBe("one\n");
-  });
-});
-
-describe("sync CLI", () => {
-  test("positional invocation previews without applying or advancing a pin", () => {
-    expect(parseSyncArgs(["pstack", "e43c7ee"])).toMatchObject({ apply: false, finalize: false, json: false });
-    expect(parseSyncArgs(["pstack", "e43c7ee", "--apply"])).toMatchObject({ apply: true, finalize: false });
-    expect(parseSyncArgs(["pstack", "e43c7ee", "--finalize"])).toMatchObject({ apply: true, finalize: true });
+describe("sync CLI arguments", () => {
+  test("flags parse into options", () => {
+    expect(parseSyncArgs(["pstack", "e43c7ee"])).toEqual({ component: "pstack", sha: "e43c7ee", apply: false, full: false, json: false, source: null });
+    expect(parseSyncArgs(["pstack", "e43c7ee", "--apply", "--full", "--json", "--source", "/tmp/up"])).toEqual({ component: "pstack", sha: "e43c7ee", apply: true, full: true, json: true, source: "/tmp/up" });
   });
 
   test("bad flags and incomplete paths fail before any operation", () => {
-    expect(() => parseSyncArgs(["pstack", "e43c7ee", "--merge"])).toThrow("unknown option");
-    expect(() => parseSyncArgs(["pstack", "e43c7ee", "--review"])).toThrow("requires a path");
+    expect(() => parseSyncArgs(["pstack", "e43c7ee", "--finalize"])).toThrow("unknown option: --finalize");
+    expect(() => parseSyncArgs(["pstack", "e43c7ee", "--source"])).toThrow("--source requires a path");
     expect(() => parseSyncArgs(["pstack", "HEAD"])).toThrow("usage:");
-  });
-
-  test("preview and failed finalization hold the pin; verified finalization preserves the old revision in its report", () => {
-    const source = tree({ "pstack/a.md": "old\n" });
-    const git = (...args) => execFileSync("git", ["-C", source, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
-    git("init", "-q");
-    const commit = () => {
-      git("add", ".");
-      git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "commit", "-qm", "fixture");
-      return git("rev-parse", "HEAD");
-    };
-    const from = commit();
-    writeFileSync(join(source, "pstack/a.md"), "new\n");
-    const to = commit();
-    const upstream = { remote: source, components: { pstack: { upstreamPath: "pstack", localPath: "plugin", sha: from } } };
-    const repository = tree({
-      "tools/upstream.json": JSON.stringify(upstream),
-      "tools/substitutions.json": JSON.stringify({ substitutions: [], denylist: [] }),
-      "plugin/a.md": "old\n",
-      "tools/generate.mjs": 'throw new Error("fixture verification failure");\n',
-      "tests/skill-collision-repro.sh": "#!/bin/sh\nexit 0\n",
-      "tests/fixture.test.mjs": 'import {test,expect} from "bun:test"; test("fixture",()=>expect(true).toBe(true));\n',
-      "review.json": JSON.stringify({ components: { pstack: { from, to, decisions: [{ path: "a.md", revision: revision("new\n"), action: "adopt", reason: "verified fixture change" }] } } }),
-    });
-    const args = ["pstack", to, "--source", source, "--review", join(repository, "review.json")];
-    const preview = main(args, repository);
-    expect(preview.result.pinAdvanced).toBe(false);
-    expect(readFileSync(join(repository, "plugin/a.md"), "utf8")).toBe("old\n");
-    expect(() => main([...args, "--finalize"], repository)).toThrow();
-    expect(JSON.parse(readFileSync(join(repository, "tools/upstream.json"))).components.pstack.sha).toBe(from);
-    writeFileSync(join(repository, "tools/generate.mjs"), 'console.log("fixture verified");\n');
-    const finalized = main([...args, "--finalize"], repository);
-    expect(finalized.result).toMatchObject({ from, to, pinAdvanced: true });
-    expect(JSON.parse(readFileSync(join(repository, "tools/upstream.json"))).components.pstack.sha).toBe(to);
-    expect(readFileSync(join(repository, "plugin/a.md"), "utf8")).toBe("new\n");
-    expect(main([...args, "--finalize"], repository).result).toMatchObject({ from: to, to, pinAdvanced: false, written: [] });
-    const fork = join(tree({}), "clone");
-    execFileSync("git", ["clone", "--quiet", source, fork]);
-    writeFileSync(join(fork, "pstack/a.md"), "unregistered\n");
-    execFileSync("git", ["-C", fork, "add", "."]);
-    execFileSync("git", ["-C", fork, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "commit", "-qm", "local only"]);
-    const unreachable = execFileSync("git", ["-C", fork, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
-    writeFileSync(join(repository, "review.json"), JSON.stringify({ components: { pstack: { from: to, to: unreachable, decisions: [{ path: "a.md", revision: revision("unregistered\n"), action: "adopt", reason: "fixture" }] } } }));
-    expect(() => main(["pstack", unreachable, "--source", fork, "--review", join(repository, "review.json"), "--finalize"], repository)).toThrow("registered upstream");
-    expect(JSON.parse(readFileSync(join(repository, "tools/upstream.json"))).components.pstack.sha).toBe(to);
-    expect(readFileSync(join(repository, "plugin/a.md"), "utf8")).toBe("new\n");
-  });
-
-  test("scheduled review has no repository mutation permissions", () => {
-    const workflow = Bun.YAML.parse(readFileSync(join(import.meta.dir, "../.github/workflows/sync-upstream.yml"), "utf8"));
-    expect(workflow.permissions).toEqual({ contents: "read" });
-    for (const job of Object.values(workflow.jobs)) {
-      expect(job.permissions).toBeUndefined();
-      for (const step of job.steps) {
-        if (step.uses?.startsWith("actions/checkout@")) expect(step.with["persist-credentials"]).toBe(false);
-        if (step.run) expect(step.run).not.toMatch(/gh pr merge|git push|--apply|--finalize/);
-      }
-    }
   });
 });

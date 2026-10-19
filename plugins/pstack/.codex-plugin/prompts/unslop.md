@@ -1,6 +1,6 @@
 ---
 name: unslop
-description: clean up writing by removing AI tells
+description: "clean up writing by removing AI tells"
 disable-model-invocation: true
 ---
 

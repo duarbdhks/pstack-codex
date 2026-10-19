@@ -1,6 +1,6 @@
 ---
 name: typescript-best-practices
-description: ground type-system discipline in TypeScript syntax
+description: "ground type-system discipline in TypeScript syntax"
 disable-model-invocation: true
 ---
 

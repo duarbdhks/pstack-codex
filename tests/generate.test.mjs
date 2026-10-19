@@ -4,9 +4,17 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
-import { codexModelNamesSection, dispatchProfilesSection, legacyModelNamesSection, setupModelsSection, strayModelSlugs, validateRoutingCatalog } from "../tools/generate.mjs";
+import { codexModelNamesSection, dispatchProfilesSection, legacyModelNamesSection, modelsSection, promptStub, publicSkills, renderReadmeTable, setupModelsSection, strayModelSlugs, upsertSection, validateRoutingCatalog } from "../tools/generate.mjs";
 
 const models = JSON.parse(readFileSync(join(import.meta.dir, "../plugins/pstack/models.json"), "utf8"));
+
+describe("prompt stubs", () => {
+  test("quote a menu line that carries a YAML separator", () => {
+    expect(promptStub({ name: "sharpen", menu: "Sharpen a task before starting: the expert approach" })).toBe(
+      '---\nname: sharpen\ndescription: "Sharpen a task before starting: the expert approach"\ndisable-model-invocation: true\n---\n\nInvoke the `sharpen` skill and follow it.\n',
+    );
+  });
+});
 
 describe("model policy", () => {
   test("routes GPT-6 roles without adding a simultaneous DeepSeek seat", () => {
@@ -100,6 +108,17 @@ describe("routing catalog generation", () => {
     const before = digests();
     generate();
     expect(digests()).toEqual(before);
+    const skills = join(fixture, "plugins/pstack/skills");
+    expect(readFileSync(join(skills, "how/SKILL.md"), "utf8")).toEndWith(
+      "\n## Codex runtime\n\nOn Codex, upstream tool, path, and agent names in this skill map through [codex-tools.md](../poteto-mode/references/codex-tools.md). " +
+        "A `<role model>` placeholder is the role's model resolved by [Codex routing](../poteto-mode/references/codex-routing.md). " +
+        "Where a step here says to omit `model`, run on the parent model, or fall back to another slug after a rejection, " +
+        "the Codex spawn contract wins: resolve the pair or stop before spawning.\n",
+    );
+    const potetoMode = readFileSync(join(skills, "poteto-mode/SKILL.md"), "utf8");
+    expect(potetoMode).toContain("\n## Codex runtime\n\nOn Codex, use the native execution contract in [codex-tools.md](references/codex-tools.md).");
+    expect(potetoMode).toContain("Other runtimes use [legacy-tools.md](references/legacy-tools.md). Where a step here says to omit `model`, run on the parent model, or fall back to another slug after a rejection, the Codex spawn contract wins: resolve the pair or stop before spawning.\n");
+    expect(readFileSync(join(skills, "principle-laziness-protocol/SKILL.md"), "utf8")).not.toContain("## Codex runtime");
     const standalone = join(fixture, "standalone");
     mkdirSync(standalone);
     const scripts = join(fixture, "plugins/pstack/skills/poteto-mode/scripts");
@@ -119,5 +138,64 @@ describe("strayModelSlugs", () => {
     expect(strayModelSlugs("skills/x/SKILL.md", "use deepseek-flash here")).toEqual([
       "skills/x/SKILL.md:1: use deepseek-flash here",
     ]);
+  });
+
+  test("flags a composer slug in prose but not inside a stamped Codex runtime section", () => {
+    expect(strayModelSlugs("x.md", "run composer-2 here\n\n## Codex runtime\n\nrun composer-2 there\n")).toEqual(["x.md:1: run composer-2 here"]);
+  });
+});
+
+describe("stamped sections", () => {
+  test("upsertSection appends a missing section, then replaces it in place idempotently", () => {
+    const appended = upsertSection("# Skill\n\nBody.\n\n\n", "Models", "- a");
+    expect(appended).toBe("# Skill\n\nBody.\n\n## Models\n\n- a\n");
+    const replaced = upsertSection(appended, "Models", "- b");
+    expect(replaced).toBe("# Skill\n\nBody.\n\n## Models\n\n- b\n");
+    expect(upsertSection(replaced, "Models", "- b")).toBe(replaced);
+    expect(upsertSection("## Models\n\nold\n\n## Codex runtime\n\nx\n", "Models", "new")).toBe("## Models\n\nnew\n\n## Codex runtime\n\nx\n");
+  });
+
+  test("the Models section links the spawn contract relative to the skill", () => {
+    const roles = [{ role: "swarm workers", models: ["gpt-6-luna"] }];
+    expect(modelsSection(roles, "poteto-mode")).toContain("[Codex spawn contract](references/codex-tools.md#codex-spawn-contract)");
+    expect(modelsSection(roles, "swarm")).toContain(
+      "[Codex spawn contract](../poteto-mode/references/codex-tools.md#codex-spawn-contract): `agent_type: \"default\"`, the role as `task_name`, " +
+        "and the `model` and `reasoning_effort` pair resolved by [Codex routing](../poteto-mode/references/codex-routing.md). " +
+        "An omitted model inherits the parent and is an error.\n\n- swarm workers: `gpt-6-luna`",
+    );
+  });
+});
+
+describe("public skill menu lines", () => {
+  const skillsDir = (skills) => {
+    const dir = mkdtempSync(join(tmpdir(), "pstack-skills-"));
+    for (const [name, front] of Object.entries(skills)) {
+      mkdirSync(join(dir, name));
+      writeFileSync(join(dir, name, "SKILL.md"), `---\nname: ${name}\n${front}---\n\nBody.\n`);
+    }
+    return dir;
+  };
+
+  test("menu-description wins, else the first sentence of description, quotes stripped", () => {
+    const dir = skillsDir({
+      menu: "description: Long. Words.\nmenu-description: port line\n",
+      plain: "description: Restate the goal.\n",
+      quoted: 'description: "Sharpen a task before starting. Use for /sharpen."\n',
+      "principle-x": "description: hidden\nuser-invocable: false\n",
+    });
+    expect(publicSkills(dir)).toEqual([
+      { name: "menu", menu: "port line" },
+      { name: "plain", menu: "Restate the goal" },
+      { name: "quoted", menu: "Sharpen a task before starting" },
+    ]);
+    expect(() => publicSkills(skillsDir({ bare: "" }))).toThrow("neither menu-description nor description");
+  });
+
+  test("the README table follows the editorial order, then appends unlisted skills alphabetically", () => {
+    const readme = "# R\n\n| command | use it when |\n| --- | --- |\n| `/old` | stale |\n\nAfter.\n";
+    const skills = [{ name: "zeta", menu: "z" }, { name: "how", menu: "h" }, { name: "alpha", menu: "a" }, { name: "poteto-mode", menu: "p" }];
+    expect(renderReadmeTable(readme, skills)).toBe(
+      "# R\n\n| command | use it when |\n| --- | --- |\n| `/poteto-mode` | p |\n| `/how` | h |\n| `/alpha` | a |\n| `/zeta` | z |\n\nAfter.\n",
+    );
   });
 });

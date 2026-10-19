@@ -7,9 +7,10 @@
 // Sources of truth:
 //   VERSION  -> the "version" field in the Codex plugin manifest
 //   CHANGES.md must carry a heading for the current VERSION (release completeness)
-//   each public skill's frontmatter (name + menu-description)
+//   each public skill's frontmatter (name + menu-description, else description)
 //     -> its Codex prompt stub in plugins/pstack/.codex-plugin/prompts/
 //     -> its row in README.md's "Slash commands" table
+//     -> its "## Codex runtime" section
 //   plugins/pstack/models.json (catalog, role metadata, adaptive profiles)
 //     -> each model-consuming skill's "## Models" section
 //     -> setup-pstack's override-sheet block and interrogate's reviewer table
@@ -83,9 +84,15 @@ export function frontmatterValue(text, key) {
   return line?.slice(key.length + 2);
 }
 
+function menuFromDescription(description) {
+  if (!description) return undefined;
+  return description.replace(/^"(.*)"$/, "$1").split(". ")[0].replace(/\.$/, "").trim();
+}
+
 // A public skill is any skills/<name>/SKILL.md not marked user-invocable: false
-// (the principle-* leaves). Each must carry menu-description, the one-liner the
-// Codex slash menu and the README command table both render.
+// (the principle-* leaves). Its menu line, which the Codex slash menu and the
+// README command table both render, is menu-description or else derived from
+// description.
 export function publicSkills(skillsDir) {
   const skills = [];
   for (const entry of readdirSync(skillsDir).sort()) {
@@ -96,23 +103,24 @@ export function publicSkills(skillsDir) {
     if (front.split("\n").includes("user-invocable: false")) continue;
     const name = frontmatterValue(text, "name");
     if (name !== entry) throw new Error(`${path}: frontmatter name "${name}" != directory "${entry}"`);
-    const menu = frontmatterValue(text, "menu-description");
-    if (!menu) throw new Error(`${path}: public skill has no menu-description frontmatter`);
+    const menu = frontmatterValue(text, "menu-description") || menuFromDescription(frontmatterValue(text, "description"));
+    if (!menu) throw new Error(`${path}: public skill has neither menu-description nor description frontmatter`);
     skills.push({ name, menu });
   }
   return skills;
 }
 
 export function promptStub({ name, menu }) {
-  return `---\nname: ${name}\ndescription: ${menu}\ndisable-model-invocation: true\n---\n\nInvoke the \`${name}\` skill and follow it.\n`;
+  // A JSON string is a valid YAML scalar even when an upstream menu line carries ": ".
+  return `---\nname: ${name}\ndescription: ${JSON.stringify(menu)}\ndisable-model-invocation: true\n---\n\nInvoke the \`${name}\` skill and follow it.\n`;
 }
 
 const code = (s) => `\`${s}\``;
 const codeList = (models) => models.map(code).join(", ");
 
 // Replace the body of a "## <title>" section (everything up to the next "## "
-// heading or EOF). Throws when the heading is absent — a Models section is a
-// structural anchor, not an optional nicety.
+// heading or EOF). Throws when the heading is absent: port-owned docs keep
+// their stamped sections as structural anchors.
 export function replaceSection(text, title, body, file) {
   const lines = text.split("\n");
   const start = lines.indexOf(`## ${title}`);
@@ -123,13 +131,46 @@ export function replaceSection(text, title, body, file) {
   return lines.join("\n");
 }
 
-export function modelsSection(roles) {
+// Mirrored upstream skills lose port sections on every sync, so their stamped
+// sections are appended when absent.
+export function upsertSection(text, title, body) {
+  if (text.split("\n").includes(`## ${title}`)) return replaceSection(text, title, body);
+  return `${text.replace(/\n*$/, "\n")}\n## ${title}\n\n${body}\n`;
+}
+
+const referencesFrom = (skill) => skill === "poteto-mode" ? "references/" : "../poteto-mode/references/";
+
+export function modelsSection(roles, skill) {
   const bullets = roles.map((r) => `- ${r.role}: ${codeList(r.models)}`).join("\n");
+  const refs = referencesFrom(skill);
   return (
     "Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). " +
     "A matching role line in `~/.codex/pstack-models.md` " +
     "overrides each at runtime; see `/setup-pstack`.\n\n" +
+    `On Codex, dispatch each role below with the [Codex spawn contract](${refs}codex-tools.md#codex-spawn-contract): ` +
+    '`agent_type: "default"`, the role as `task_name`, and the `model` and `reasoning_effort` pair resolved by ' +
+    `[Codex routing](${refs}codex-routing.md). An omitted model inherits the parent and is an error.\n\n` +
     bullets
+  );
+}
+
+export function codexRuntimeSection(skill) {
+  const spawnContractWins =
+    "Where a step here says to omit `model`, run on the parent model, or fall back to another slug after a rejection, " +
+    "the Codex spawn contract wins: resolve the pair or stop before spawning.";
+  if (skill === "poteto-mode") {
+    return (
+      "On Codex, use the native execution contract in [codex-tools.md](references/codex-tools.md). " +
+      "Before delegation, read [Codex routing](references/codex-routing.md), resolve the configured model and effort with its executable helper, " +
+      "and pass both to the active spawn tool. Upstream tool, path, and model names in this skill map through that contract; " +
+      "a `<role model>` placeholder is the role's routed model. Other runtimes use [legacy-tools.md](references/legacy-tools.md). " +
+      spawnContractWins
+    );
+  }
+  return (
+    "On Codex, upstream tool, path, and agent names in this skill map through [codex-tools.md](../poteto-mode/references/codex-tools.md). " +
+    "A `<role model>` placeholder is the role's model resolved by [Codex routing](../poteto-mode/references/codex-routing.md). " +
+    spawnContractWins
   );
 }
 
@@ -251,14 +292,15 @@ export function dispatchProfilesSection(models) {
 
 // After stamping, no model slug may survive in skill prose outside the
 // generator-owned regions. The scan blanks each owned line range (keeping
-// line numbers stable) and reports whatever still matches.
-const SLUG_RE =
-  /\b(?:claude-(?:opus|fable|sonnet|haiku)[0-9a-z.-]*|gpt-(?:5|6)(?:\.\d+)?(?:-[a-z0-9]+)*|grok-4(?:\.\d+)?(?:-[a-z0-9]+)*|deepseek-[0-9a-z.-]*|ocx-(?:gpt|xai|anthropic)[0-9a-z.-]*|xai\/grok-4(?:\.\d+)?)\b/;
+// line numbers stable) and reports whatever still matches. tools/sync.mjs
+// replaces the same slugs in mirrored markdown with "<role model>".
+export const MODEL_SLUG_RE =
+  /\b(?:claude-(?:opus|fable|sonnet|haiku)[0-9a-z.-]*|gpt-(?:5|6)(?:\.\d+)?(?:-[a-z0-9]+)*|grok-4(?:\.\d+)?(?:-[a-z0-9]+)*|composer-\d[0-9a-z.-]*|deepseek-[0-9a-z.-]*|ocx-(?:gpt|xai|anthropic)[0-9a-z.-]*|xai\/grok-4(?:\.\d+)?)\b/;
 
 // [start, end) line ranges of every generator-owned region in this file.
 export function ownedRanges(lines) {
   const ranges = [];
-  const sectionStarts = ["## Models", "## Model names", "## Dispatch profiles"];
+  const sectionStarts = ["## Models", "## Model names", "## Dispatch profiles", "## Codex runtime"];
   for (const heading of sectionStarts) {
     const start = lines.indexOf(heading);
     if (start === -1) continue;
@@ -286,16 +328,16 @@ export function strayModelSlugs(path, text) {
   const owned = ownedRanges(lines);
   const strays = [];
   lines.forEach((line, i) => {
-    if (!SLUG_RE.test(line)) return;
+    if (!MODEL_SLUG_RE.test(line)) return;
     if (owned.some(([s, e]) => i >= s && i < e)) return;
     strays.push(`${path}:${i + 1}: ${line.trim()}`);
   });
   return strays;
 }
 
-// Editorial ordering of the README "Slash commands" table. Set-checked against
-// the public skills on every run: adding or retiring a skill without updating
-// this list fails here by name.
+// Editorial ordering of the README "Slash commands" table. Listed names
+// without a public skill are skipped; public skills missing from the list
+// follow alphabetically, so an upstream skill lands without editing this.
 const README_COMMAND_ORDER = [
   "poteto-mode", "how", "why", "architect", "arena", "interrogate",
   "automate-me", "reflect", "correct", "tdd", "typescript-best-practices", "teach",
@@ -308,21 +350,16 @@ const README_COMMAND_ORDER = [
 
 export function renderReadmeTable(readme, skills) {
   const byName = new Map(skills.map((s) => [s.name, s]));
-  const missing = README_COMMAND_ORDER.filter((n) => !byName.has(n));
-  const extra = skills.filter((s) => !README_COMMAND_ORDER.includes(s.name)).map((s) => s.name);
-  if (missing.length || extra.length) {
-    throw new Error(
-      `README_COMMAND_ORDER in tools/generate.mjs is out of sync with the public skills` +
-        (missing.length ? `; listed but not a skill: ${missing.join(", ")}` : "") +
-        (extra.length ? `; skill without a row: ${extra.join(", ")}` : ""),
-    );
-  }
+  const order = [
+    ...README_COMMAND_ORDER.filter((n) => byName.has(n)),
+    ...[...byName.keys()].filter((n) => !README_COMMAND_ORDER.includes(n)).sort(),
+  ];
   const lines = readme.split("\n");
   const header = lines.indexOf("| command | use it when |");
   if (header === -1) throw new Error('README.md: "| command | use it when |" table header not found');
   let end = header + 1;
   while (end < lines.length && lines[end].startsWith("|")) end++;
-  const rows = README_COMMAND_ORDER.map((n) => `| \`/${n}\` | ${byName.get(n).menu} |`);
+  const rows = order.map((n) => `| \`/${n}\` | ${byName.get(n).menu} |`);
   lines.splice(header, end - header, "| command | use it when |", "| --- | --- |", ...rows);
   return lines.join("\n");
 }
@@ -377,7 +414,7 @@ function main() {
     if (skill === "interrogate") {
       text = stampReviewerTable(text, models, path);
     } else {
-      text = replaceSection(text, "Models", modelsSection(roles), path);
+      text = upsertSection(text, "Models", modelsSection(roles, skill));
     }
     if (stampFile(path, text, `skills/${skill}/SKILL.md (models)`)) modelStamps++;
   }
@@ -425,6 +462,14 @@ function main() {
   console.log("ok: no stray model slugs in skill prose");
 
   const skills = publicSkills(skillsDir);
+
+  let runtimeStamps = 0;
+  for (const { name } of skills) {
+    const path = join(skillsDir, name, "SKILL.md");
+    const text = readFileSync(path, "utf8");
+    if (stampFile(path, upsertSection(text, "Codex runtime", codexRuntimeSection(name)), `skills/${name}/SKILL.md (Codex runtime)`)) runtimeStamps++;
+  }
+  if (runtimeStamps === 0) console.log(`ok: ${skills.length} Codex runtime sections current`);
 
   const promptsDir = join(repo, "plugins/pstack/.codex-plugin/prompts");
   let promptsChanged = 0;

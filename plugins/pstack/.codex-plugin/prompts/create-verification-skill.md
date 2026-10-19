@@ -1,6 +1,6 @@
 ---
 name: create-verification-skill
-description: generate a project-local verification skill and feature map
+description: "generate a project-local verification skill and feature map"
 disable-model-invocation: true
 ---
 

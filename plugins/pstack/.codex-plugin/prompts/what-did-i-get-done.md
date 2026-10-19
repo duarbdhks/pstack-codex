@@ -1,6 +1,6 @@
 ---
 name: what-did-i-get-done
-description: summarize authored commits over a user-chosen period
+description: "summarize authored commits over a user-chosen period"
 disable-model-invocation: true
 ---
 

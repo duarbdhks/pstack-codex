@@ -1,6 +1,6 @@
 ---
 name: poteto-mode
-description: default entry point for any non-trivial task
+description: "default entry point for any non-trivial task"
 disable-model-invocation: true
 ---
 

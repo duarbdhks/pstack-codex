@@ -74,14 +74,12 @@ principle_leaves_hidden() {
 }
 
 codex_dispatch_uses_default_agent() {
-  local mapping swarm violations
+  local mapping violations
   mapping="$repo/plugins/pstack/skills/poteto-mode/references/codex-tools.md"
-  swarm="$repo/plugins/pstack/skills/swarm/SKILL.md"
 
   violations="$(bun -e '
     const checks = [
       [process.argv[1], /^## Codex spawn contract\n\n```json\n([\s\S]*?)\n```$/m, "<semantic role>"],
-      [process.argv[2], /^### Codex dispatch preflight\n[\s\S]*?```json\n([\s\S]*?)\n```$/m, "swarm workers"],
     ];
     for (const [path, pattern, role] of checks) {
       const file = Bun.file(path);
@@ -113,7 +111,7 @@ codex_dispatch_uses_default_agent() {
         if (contract[field] !== value) console.log(`${path} (${message})`);
       }
     }
-  ' "$mapping" "$swarm")"
+  ' "$mapping")"
   [ -z "$violations" ] || printf '%s\n' "$violations"
   return 0
 }
