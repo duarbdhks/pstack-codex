@@ -32,9 +32,9 @@ Generated from `models.json`. These are capability and effort tiers, not measure
 
 | Profile | Routine / low / shallow | Bounded / medium / standard | Complex / high / deep |
 | --- | --- | --- | --- |
-| evidence | `gpt-6-luna` / `medium` | `gpt-6-luna` / `high` | `gpt-6.1-sol` / `high` |
-| implementation | `gpt-6.1-sol` / `medium` | `gpt-6.1-sol` / `high` | `gpt-6-astra` / `high` |
-| judgment | `gpt-6.1-sol` / `high` | `gpt-6-astra` / `high` | `gpt-6-astra` / `xhigh` |
+| evidence | `gpt-6-luna` / `max` | `gpt-6-luna` / `max` | `gpt-6.1-sol` / `max` |
+| implementation | `gpt-6.1-sol` / `max` | `gpt-6.1-sol` / `max` | `gpt-6-astra` / `xhigh` |
+| judgment | `gpt-6.1-sol` / `max` | `gpt-6-astra` / `xhigh` | `gpt-6-astra` / `xhigh` |
 
 ## Resolve and dispatch
 

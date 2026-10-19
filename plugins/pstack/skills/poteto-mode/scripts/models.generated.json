@@ -30,23 +30,8 @@
       }
     },
     {
-      "label": "Grok 4.6",
-      "slug": "grok-4.6",
-      "spawn": {
-        "codex": "xai/grok-4.6"
-      }
-    },
-    {
       "label": "DeepSeek Flash",
       "slug": "deepseek-flash"
-    },
-    {
-      "label": "GPT-5.5",
-      "slug": "gpt-5.5"
-    },
-    {
-      "label": "GPT-5.4",
-      "slug": "gpt-5.4"
     }
   ],
   "codexRouting": {
@@ -55,39 +40,39 @@
       "evidence": [
         {
           "model": "gpt-6-luna",
-          "effort": "medium"
+          "effort": "max"
         },
         {
           "model": "gpt-6-luna",
-          "effort": "high"
+          "effort": "max"
         },
         {
           "model": "gpt-6.1-sol",
-          "effort": "high"
+          "effort": "max"
         }
       ],
       "implementation": [
         {
           "model": "gpt-6.1-sol",
-          "effort": "medium"
+          "effort": "max"
         },
         {
           "model": "gpt-6.1-sol",
-          "effort": "high"
+          "effort": "max"
         },
         {
           "model": "gpt-6-astra",
-          "effort": "high"
+          "effort": "xhigh"
         }
       ],
       "judgment": [
         {
           "model": "gpt-6.1-sol",
-          "effort": "high"
+          "effort": "max"
         },
         {
           "model": "gpt-6-astra",
-          "effort": "high"
+          "effort": "xhigh"
         },
         {
           "model": "gpt-6-astra",
