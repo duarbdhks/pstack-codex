@@ -26,10 +26,6 @@ const CODEX_DISPATCH_CONTRACT = `# Codex tools
 \`\`\`
 `;
 
-const CODEX_SWARM_CONTRACT = CODEX_DISPATCH_CONTRACT
-  .replace("## Codex spawn contract", "### Codex dispatch preflight")
-  .replace('"<semantic role>"', '"swarm workers"');
-
 function skill(dir, name, front, body = "body") {
   mkdirSync(join(dir, "plugins/pstack/skills", name), { recursive: true });
   writeFileSync(
@@ -48,7 +44,6 @@ function fixture(mutate = () => {}) {
   const dir = mkdtempSync(join(tmpdir(), "invariants-"));
   skill(dir, "good", "");
   skill(dir, "principle-good", "user-invocable: false\n");
-  skill(dir, "swarm", "", CODEX_SWARM_CONTRACT);
   codexTools(dir);
   mutate(dir);
   return dir;
@@ -134,28 +129,19 @@ describe("skill-collision-repro.sh static invariants", () => {
     expect(out).toContain("message must carry the complete task");
   });
 
-  test.each([
-    ["model", CODEX_SWARM_CONTRACT.replace('  "model": "<configured model>",\n', ""), "model must be explicit"],
-    ["reasoning effort", CODEX_SWARM_CONTRACT.replace('  "reasoning_effort": "<configured effort>",\n', ""), "reasoning_effort must be explicit"],
-    ["hard-coded effort", CODEX_SWARM_CONTRACT.replace('"<configured effort>"', '"max"'), "reasoning_effort must be explicit"],
-    ["message", CODEX_SWARM_CONTRACT.replace('"message"', '"prompt"'), "message must carry the complete task"],
-  ])("an invalid swarm %s fails", (_name, contract, expected) => {
-    const dir = fixture((d) => skill(d, "swarm", "", contract));
-    const { code, out } = run(dir);
+  test("a hard-coded Codex effort fails", () => {
+    const { code, out } = run(fixture((d) => codexTools(d, CODEX_DISPATCH_CONTRACT.replace('"<configured effort>"', '"max"'))));
     expect(code).toBe(1);
-    expect(out).toContain("skills/swarm/SKILL.md");
-    expect(out).toContain(expected);
+    expect(out).toContain("codex-tools.md (reasoning_effort must be explicit)");
   });
 
-  test("swarm cannot inherit the parent model while hard-coding max", () => {
-    const contract = CODEX_SWARM_CONTRACT
-      .replace('  "model": "<configured model>",\n', "")
-      .replace('"<configured effort>"', '"max"');
-    const dir = fixture((d) => skill(d, "swarm", "", contract));
-    const { code, out } = run(dir);
-    expect(code).toBe(1);
-    expect(out).toContain("model must be explicit");
-    expect(out).toContain("reasoning_effort must be explicit");
+  test("a missing or malformed Codex spawn contract fails", () => {
+    const missing = run(fixture((d) => codexTools(d, "# Codex tools\n")));
+    expect(missing.code).toBe(1);
+    expect(missing.out).toContain("codex-tools.md (missing Codex spawn contract)");
+    const malformed = run(fixture((d) => codexTools(d, CODEX_DISPATCH_CONTRACT.replace('"fork_turns": "none",', '"fork_turns": none,'))));
+    expect(malformed.code).toBe(1);
+    expect(malformed.out).toContain("codex-tools.md (Codex spawn contract must be valid JSON)");
   });
 
   test("comment-sicko mapped to no-comments/SKILL.md fails", () => {

@@ -1,6 +1,6 @@
 ---
 name: show-me-your-work
-description: log decisions to a reviewable tsv decision trail
+description: "log decisions to a reviewable tsv decision trail"
 disable-model-invocation: true
 ---
 

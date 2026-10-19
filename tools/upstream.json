@@ -4,7 +4,7 @@
     "pstack": {
       "upstreamPath": "pstack",
       "localPath": "plugins/pstack",
-      "sha": "12d587dfb20741cafc376c42c696c5f6e2a64487",
+      "sha": "7b353f78f6ec193bdbe48ed8059444eb09b6878e",
       "exclude": [
         {
           "pathPrefix": "automations/",
@@ -45,13 +45,121 @@
         {
           "pathPrefix": "LICENSE",
           "reason": "upstream license already carried at the repo root"
+        },
+        {
+          "pathPrefix": "plugin.json",
+          "reason": "Agent Plugins root manifest; the port ships .codex-plugin"
+        },
+        {
+          "pathPrefix": "docs/harness/",
+          "reason": "Claude Code harness notes; not a Codex runtime"
+        }
+      ],
+      "portOwned": [
+        {
+          "pathPrefix": ".codex-plugin/",
+          "reason": "Codex plugin manifest and prompt stubs"
+        },
+        {
+          "pathPrefix": "models.json",
+          "reason": "Codex and OpenCodex model catalog"
+        },
+        {
+          "pathPrefix": "skills/setup-pstack/SKILL.md",
+          "reason": "Codex model setup"
+        },
+        {
+          "pathPrefix": "skills/poteto-mode/references/codex-tools.md",
+          "reason": "Codex runtime contract"
+        },
+        {
+          "pathPrefix": "skills/poteto-mode/references/codex-routing.md",
+          "reason": "Codex routing"
+        },
+        {
+          "pathPrefix": "skills/poteto-mode/references/codex-routing-policy.md",
+          "reason": "Codex routing policy"
+        },
+        {
+          "pathPrefix": "skills/poteto-mode/references/legacy-tools.md",
+          "reason": "Claude Code and Grok compatibility mappings"
+        },
+        {
+          "pathPrefix": "skills/poteto-mode/scripts/route.mjs",
+          "reason": "Codex routing resolver"
+        },
+        {
+          "pathPrefix": "skills/poteto-mode/scripts/models.generated.json",
+          "reason": "bundled routing catalog, stamped from models.json"
+        },
+        {
+          "pathPrefix": "skills/babysit/",
+          "reason": "port-only skill kept from an earlier cursor-team-kit import; upstream has no skills/babysit"
+        }
+      ],
+      "remap": [
+        {
+          "from": "agents/comment-sicko.md",
+          "to": "skills/no-comments/references/comment-sicko.md"
         }
       ]
     },
     "cursor-team-kit": {
       "upstreamPath": "cursor-team-kit/skills",
       "localPath": "plugins/pstack/skills",
-      "sha": "e46364b8be46000b7df0f260550cd712afbb8d36"
+      "sha": "e46364b8be46000b7df0f260550cd712afbb8d36",
+      "exclude": [
+        {
+          "pathPrefix": "check-compiler-errors/",
+          "reason": "not imported into the Codex port"
+        },
+        {
+          "pathPrefix": "control-cli/",
+          "reason": "not imported into the Codex port"
+        },
+        {
+          "pathPrefix": "control-ui/",
+          "reason": "not imported into the Codex port"
+        },
+        {
+          "pathPrefix": "loop-on-ci/",
+          "reason": "not imported into the Codex port"
+        },
+        {
+          "pathPrefix": "new-branch-and-pr/",
+          "reason": "not imported into the Codex port"
+        },
+        {
+          "pathPrefix": "pr-review-canvas/",
+          "reason": "not imported into the Codex port"
+        },
+        {
+          "pathPrefix": "review-and-ship/",
+          "reason": "not imported into the Codex port"
+        },
+        {
+          "pathPrefix": "run-smoke-tests/",
+          "reason": "not imported into the Codex port"
+        },
+        {
+          "pathPrefix": "verify-this/",
+          "reason": "not imported into the Codex port"
+        },
+        {
+          "pathPrefix": "weekly-review/",
+          "reason": "not imported into the Codex port"
+        },
+        {
+          "pathPrefix": "workflow-from-chats/",
+          "reason": "not imported into the Codex port"
+        }
+      ],
+      "portOwned": [
+        {
+          "pathPrefix": "thermo-nuclear-code-quality-review/SKILL.md",
+          "reason": "the port adds the layered Report Format section"
+        }
+      ]
     }
   }
 }

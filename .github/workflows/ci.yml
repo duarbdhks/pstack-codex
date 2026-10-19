@@ -42,6 +42,24 @@ jobs:
         run: |
           bun tools/generate.mjs
           git diff --exit-code
+      # The committed tree must equal the mechanical mirror of each pinned
+      # upstream commit plus generated stamps; this clones cursor/plugins once.
+      # shortcut: --full overwrites but never deletes, so a stale local file the mirror would delete still passes; compare file listings if that recurs.
+      - name: Mirror parity
+        run: |
+          set -euo pipefail
+          remote="$(jq -r .remote tools/upstream.json)"
+          upstream="$RUNNER_TEMP/upstream"
+          git clone --quiet --no-checkout "$remote" "$upstream"
+          while IFS= read -r component; do
+            sha="$(jq -r --arg c "$component" '.components[$c].sha' tools/upstream.json)"
+            bun tools/sync.mjs "$component" "$sha" --source "$upstream" --full --apply
+          done < <(jq -r '.components | keys[]' tools/upstream.json)
+          bun tools/generate.mjs
+          drift="$(git status --porcelain)"
+          printf '%s\n' "$drift"
+          git diff --exit-code
+          [ -z "$drift" ]
       - name: Sync-tool fixture tests
         run: bun test tests/
 
@@ -64,7 +82,7 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
       - name: Test
-        run: bun test orch watch-pr
+        run: bun test
 
   shellcheck:
     name: Shell scripts

@@ -58,3 +58,7 @@ When code behavior should stay untouched, prefer PR description and review notes
 - Never hide meaningful behavior changes inside "cleanup".
 - Do not bypass hooks unless the user explicitly asks.
 - If the PR is too large to make reviewable with notes, recommend splitting instead of polishing around the problem.
+
+## Codex runtime
+
+On Codex, upstream tool, path, and agent names in this skill map through [codex-tools.md](../poteto-mode/references/codex-tools.md). A `<role model>` placeholder is the role's model resolved by [Codex routing](../poteto-mode/references/codex-routing.md). Where a step here says to omit `model`, run on the parent model, or fall back to another slug after a rejection, the Codex spawn contract wins: resolve the pair or stop before spawning.

@@ -1,6 +1,26 @@
-# CHANGES — applied substitutions
+# Changes
 
-This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
+This record preserves the historical port and the deliberate Codex-native changes. Shared workflow content mirrors upstream; native execution and routing are owned here.
+
+## 0.11.0 Upstream mirror
+
+pstack-codex now mirrors upstream pstack instead of selecting from it. This release catches up from upstream 0.15.9 (`e43c7ee`) to 0.15.27 (`7b353f7`). It updates 86 files and adds `/ketchup`, `/sharpen`, `/in-your-own-words`, `/poteto-help`, `/create-formal-verification-skill`, `/maintain-formal-verification-skill`, and the plan-check tests. Shared content that 0.10.0 had adapted or held back now matches upstream. The stale `poteto-mode/references/plan.md`, which upstream deleted earlier, is removed.
+
+Codex model routing stays port-owned. The mirror never writes `models.json`, `route.mjs`, the routing and tool references, or `/setup-pstack`. Upstream model names in prose become `<role model>`. Generated `## Models` and `## Codex runtime` sections carry the Codex dispatch rule into every affected skill. Upstream's typed-only skills become explicit-only on Codex through `agents/openai.yaml`, so pstack skills run when invoked, such as `$pstack:poteto-mode`.
+
+Upstream's new `/setup-pstack` step that offers a formal verification skill is ported into the Codex steps. Its Cursor model defaults and effort budget changes are not, because model selection belongs to `pstack-models.md`.
+
+The scheduled workflow now lands each later upstream change as a patch release when its checks pass. Upstream code runs in a read-only job; a separate job with write access validates the resulting patch and lands it. An upstream change to a port-owned file waits for a manual merge. The workflow keeps one issue open while a change cannot land. CI rebuilds the mirror from the pin and fails on a hand edit to a mirrored file. The cursor-team-kit component lists the upstream skills the port never imported and keeps the port's thermo-nuclear report format.
+
+## 0.10.0 Codex routing and selective upstream review
+
+The executable routing helper resolves model and reasoning effort together. Fixed and OCX selections retain their meaning. Explicitly enabled adaptive profiles choose a tier from task difficulty, failure cost, and reasoning depth. Capability failures can escalate once, with a fresh bounded attempt, after the prior result has been recovered and verified. Requested pairs are compared with the exact child's actual `turn_context`. The catalog and generated documentation share one source, including a bundled catalog for independent skill copies.
+
+Codex tool and verification contracts now use current native capabilities. Legacy Claude and Grok mappings remain a disclosed compatibility reference. `/setup-pstack` previews a requested adaptive selection and the necessary policy migration; it does not silently change existing selections or OpenCodex.
+
+Upstream pstack 0.15.9 contributes `/correct`, `benchmark-checklist`, the Explain the Number principle, four design red flags, fresh worker retries, measurement-first performance playbooks, and schema-first and PR briefing improvements. Cursor models, cloud workers, sticky mode, bot UI, hourly ticks, and automatic push rules are excluded. The detailed decisions and validation live in [the 0.10.0 record](docs/changes/0.10.0/README.md).
+
+Upstream sync now previews by default. Source-bound decisions control additions, adaptations, exclusions, and deletions. Unresolved or stale decisions block writes and pin advancement. The scheduled workflow uploads read-only reports and no longer pushes or merges. The obsolete bot-branch push planner is removed. `--finalize` advances the pin only after core verification succeeds.
 
 ## 0.9.24 — sync behavior from upstream pstack 0.15.5
 

@@ -1,6 +1,6 @@
 ---
 name: how
-description: walk through how a subsystem works
+description: "walk through how a subsystem works"
 disable-model-invocation: true
 ---
 

@@ -13,12 +13,135 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  sync:
-    name: Sync upstream
+  # Mirrored upstream code runs here (generate, tests, vendored scripts), so
+  # this job gets no write token and hands land a patch plus data only.
+  mirror:
+    name: Mirror and verify upstream
     runs-on: ubuntu-latest
     permissions:
-      contents: write # commits the synced tree and pushes branch sync/upstream
-      pull-requests: write # opens and squash-merges the sync PR when the run is clean
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.repository.default_branch }}
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.3.14"
+      - name: Mirror, verify, and record state
+        run: |
+          set -euo pipefail
+          state="$RUNNER_TEMP/state"
+          reports="$state/reports"
+          mkdir -p "$reports"
+
+          remote="$(jq -r .remote tools/upstream.json)"
+          upstream="$RUNNER_TEMP/upstream"
+          git clone --quiet --no-checkout "$remote" "$upstream"
+          upstream_sha="$(git -C "$upstream" rev-parse HEAD)"
+          printf '%s\n' "$upstream_sha" > "$state/upstream_sha"
+
+          sync_failed=0
+          any_changed=0
+          mapfile -t components < <(jq -r '.components | keys[]' tools/upstream.json)
+          for component in "${components[@]}"; do
+            if bun tools/sync.mjs "$component" "$upstream_sha" --source "$upstream" --apply --json > "$reports/$component.json" 2> "$reports/$component.err"; then
+              if [ "$(jq -r .status "$reports/$component.json")" = "changed" ]; then
+                any_changed=1
+              fi
+            else
+              sync_failed=1
+              cat "$reports/$component.err" >&2
+            fi
+          done
+          if [ "$sync_failed" -eq 1 ]; then
+            echo failed > "$state/state"
+            exit 0
+          fi
+          if [ "$any_changed" -eq 0 ]; then
+            echo "ok: upstream $upstream_sha is current"
+            echo current > "$state/state"
+            exit 0
+          fi
+
+          summary="$state/summary.md"
+          for component in "${components[@]}"; do
+            jq -r '
+              "### \(.component): \(.status)",
+              "",
+              "- \([.changes[] | select(.kind == "added")] | length) added, \([.changes[] | select(.kind == "updated")] | length) updated, \([.changes[] | select(.kind == "deleted")] | length) deleted",
+              "- port-owned files changed upstream: \(if (.portOwnedChanged | length) == 0 then "none" else (.portOwnedChanged | map("`\(.)`") | join(", ")) end)",
+              "- warnings: \(.warnings | length)",
+              "- compare: https://github.com/cursor/plugins/compare/\(.from)...\(.to)",
+              ""
+            ' "$reports/$component.json" >> "$summary"
+          done
+          pstack_version="$(jq -r '.toVersion // "-"' "$reports/pstack.json")"
+          printf '%s\n' "$pstack_version" > "$state/pstack_version"
+          bun tools/sync-plan.mjs release "$upstream_sha" "$pstack_version" "$summary"
+          echo
+
+          failed_checks="$state/failed_checks"
+          : > "$failed_checks"
+          verify() {
+            local name="$1"
+            shift
+            if ! "$@"; then
+              printf '%s\n' "$name" >> "$failed_checks"
+            fi
+          }
+          # Staging puts new files' content in the hash, not only their names.
+          snapshot() {
+            git add -A
+            { git status --porcelain; git diff --cached; } | sha256sum
+          }
+          generate_idempotent() {
+            local first second
+            first="$(snapshot)"
+            bun tools/generate.mjs > /dev/null || return 1
+            second="$(snapshot)"
+            [ "$first" = "$second" ]
+          }
+          script_tests() {
+            (cd plugins/pstack/skills/poteto-mode/scripts && bun install --frozen-lockfile && bun run typecheck && bun test)
+          }
+          shell_lint() {
+            {
+              find . -path ./.git -prune -o -path '*/node_modules' -prune -o -name '*.sh' -print
+              grep -rlE --exclude-dir=.git --exclude-dir=node_modules '^#!/(usr/bin/env )?(ba)?sh' .
+            } | sed 's#^\./##' | sort -u | tee /dev/stderr | xargs shellcheck --severity=warning
+          }
+
+          verify generate bun tools/generate.mjs
+          verify invariants bash tests/skill-collision-repro.sh
+          verify generate-idempotent generate_idempotent
+          verify sync-tool-tests bun test tests/
+          verify script-tests script_tests
+          verify shellcheck shell_lint
+
+          git add -A
+          git diff --cached --binary --no-renames > "$state/mirror.patch"
+          echo changed > "$state/state"
+      - name: Upload mirror state
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mirror-state
+          path: ${{ runner.temp }}/state/
+          if-no-files-found: error
+          retention-days: 14
+
+  # Runs only base-branch code (tools/sync-plan.mjs, git, gh, jq) and treats
+  # the mirror artifact as data: it applies the patch but never executes it.
+  land:
+    name: Land and track
+    needs: mirror
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # commits the mirrored tree to sync/upstream and squash-merges it
+      pull-requests: write # opens, edits, and merges the sync PR
+      issues: write # keeps one tracking issue open only while landing is stuck
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -28,177 +151,250 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: "1.3.14"
-      - name: Sync, PR, and maybe merge
+      # A missing artifact is reported by the next step, not by failing here.
+      - name: Download mirror state
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: mirror-state
+          path: ${{ runner.temp }}/state
+      - name: Land and track
         env:
           GH_TOKEN: ${{ github.token }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          MIRROR_RESULT: ${{ needs.mirror.result }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          remote="$(jq -r .remote tools/upstream.json)"
-          scratch="$(mktemp -d)"
-          report="$(mktemp)"
-          trap 'rm -rf "$scratch" "$report"' EXIT
-          git clone --quiet --filter=blob:none --no-checkout "$remote" "$scratch"
+          issue_title="Upstream sync needs attention"
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          state="$RUNNER_TEMP/state"
+          reports="$state/reports"
+          summary="$state/summary.md"
+          mapfile -t components < <(jq -r '.components | keys[]' tools/upstream.json)
+          report_files=()
+          for component in "${components[@]}"; do
+            report_files+=("$reports/$component.json")
+          done
 
-          any_sync=0
-          all_ok=1
+          issue_number="$(gh issue list --state open --search "in:title \"$issue_title\"" --json number,title |
+            jq -r --arg title "$issue_title" 'map(select(.title == $title)) | .[0].number // empty')"
+          mirror_state="$(cat "$state/state" 2> /dev/null || true)"
+          upstream_sha="$(cat "$state/upstream_sha" 2> /dev/null || true)"
 
-          sync_one() {
-            local component="$1"
-            local pin upstreamPath pin_tree head_tree head_sha pin_code head_code action code out
-            pin="$(jq -r --arg c "$component" '.components[$c].sha' tools/upstream.json)"
-            upstreamPath="$(jq -r --arg c "$component" '.components[$c].upstreamPath' tools/upstream.json)"
-            set +e
-            pin_tree="$(git -C "$scratch" rev-parse "${pin}^{commit}:${upstreamPath}" 2>/dev/null)"
-            pin_code=$?
-            head_tree="$(git -C "$scratch" rev-parse "HEAD:${upstreamPath}" 2>/dev/null)"
-            head_code=$?
-            head_sha="$(git -C "$scratch" rev-parse HEAD)"
-            set -e
-            if [ "$pin_code" -ne 0 ] || [ "$head_code" -ne 0 ]; then
-              all_ok=0
-              {
-                printf '## %s\n' "$component"
-                printf 'failed: no tree for %s at pin or HEAD\n\n' "$upstreamPath"
-              } >> "$report"
-              return 0
+          needs_attention=0
+          reason=""
+          pr_url=""
+
+          pr_body() {
+            printf 'Automated upstream mirror.\n\n' &&
+              cat "$summary" &&
+              printf '### Warnings\n\n' &&
+              jq -r '.warnings[] | "- " + .' "${report_files[@]}"
+          }
+
+          land() {
+            # Refresh a bot-owned sync branch in place. A human commit means
+            # someone is mid-review, so report and leave the branch alone.
+            # That includes a closed PR whose branch is still on the remote.
+            local violations failed_checks=() pstack_version port_owned pr_number remote_tip open_flag=0 remote_flag=0 authors="" unshallow=() push_action title body="$RUNNER_TEMP/pr.md"
+            if ! violations="$(bun tools/sync-plan.mjs violations "$state/mirror.patch")"; then
+              needs_attention=1
+              reason="Checking mirror.patch against $DEFAULT_BRANCH failed, so nothing was pushed."
+              return
             fi
-            action="$(bun tools/sync-plan.mjs component "$pin_tree" "$head_tree")"
-            if [ "$action" = "skip" ]; then
-              {
-                printf '## %s\n' "$component"
-                printf 'skipped: pin tree %s is current\n\n' "$pin_tree"
-              } >> "$report"
-              return 0
+            if [ -n "$violations" ]; then
+              needs_attention=1
+              reason="mirror.patch writes outside the mirrored and stamped paths, so nothing was pushed."$'\n\n'"$violations"
+              return
             fi
-            any_sync=1
-            set +e
-            out="$(bun tools/sync.mjs "$component" "$head_sha" 2>&1)"
-            code=$?
-            set -e
-            {
-              printf '## %s\n' "$component"
-              printf 'exit: %s\n' "$code"
-              printf '%s\n\n' "$out"
-            } >> "$report"
-            if [ "$code" -ne 0 ]; then
-              all_ok=0
+            if ! mapfile -t failed_checks < "$state/failed_checks"; then
+              needs_attention=1
+              reason="The mirror state has no failed_checks record, so nothing was pushed."
+              return
             fi
-            if printf '%s\n' "$out" | grep -q 'needs manual merge'; then
-              all_ok=0
+            if ! pstack_version="$(cat "$state/pstack_version")"; then
+              needs_attention=1
+              reason="The mirror state has no pstack_version record, so nothing was pushed."
+              return
+            fi
+            if ! port_owned="$(jq -r '.component as $c | .portOwnedChanged[] | "- \($c): \(.)"' "${report_files[@]}")"; then
+              needs_attention=1
+              reason="Reading the sync reports failed, so nothing was pushed."
+              return
+            fi
+
+            if ! pr_number="$(gh pr list --head sync/upstream --state open --json number,isCrossRepository --jq 'map(select(.isCrossRepository == false)) | .[0].number // empty')"; then
+              needs_attention=1
+              reason="Looking up the open sync PR failed."
+              return
+            fi
+            if ! remote_tip="$(git ls-remote origin refs/heads/sync/upstream | awk '{print $1}')"; then
+              needs_attention=1
+              reason="Reading the remote sync/upstream branch failed."
+              return
+            fi
+            if [ -n "$pr_number" ]; then
+              open_flag=1
+            fi
+            if [ -n "$remote_tip" ]; then
+              remote_flag=1
+              # checkout is depth 1. A shallow log would only see the tip author
+              # and could hide a human commit under it. A bare branch name
+              # updates FETCH_HEAD only, and the author walk reads the
+              # remote-tracking refs.
+              if [ -f .git/shallow ]; then
+                unshallow=(--unshallow)
+              fi
+              if ! git fetch "${unshallow[@]}" origin \
+                "+refs/heads/${DEFAULT_BRANCH}:refs/remotes/origin/${DEFAULT_BRANCH}" \
+                "+refs/heads/sync/upstream:refs/remotes/origin/sync/upstream"; then
+                needs_attention=1
+                reason="Fetching sync/upstream for the author check failed."
+                return
+              fi
+              if ! authors="$(git log --format='%an' "origin/${DEFAULT_BRANCH}..origin/sync/upstream")"; then
+                needs_attention=1
+                reason="Listing sync/upstream authors failed."
+                return
+              fi
+            fi
+            if ! push_action="$(bun tools/sync-plan.mjs push "$(printf '%s\n%s\n%s\n' "$open_flag" "$remote_flag" "$authors")")"; then
+              needs_attention=1
+              reason="Planning the sync/upstream push failed."
+              return
+            fi
+            if [ "$push_action" = "report-only" ]; then
+              needs_attention=1
+              reason="Branch sync/upstream carries human commits, so this run left it alone."
+              return
+            fi
+
+            title="chore(sync): mirror upstream pstack ${pstack_version} (${upstream_sha:0:7})"
+            if ! git checkout -q -B sync/upstream; then
+              needs_attention=1
+              reason="Creating the local sync/upstream branch failed."
+              return
+            fi
+            if ! git apply --index "$state/mirror.patch"; then
+              needs_attention=1
+              reason="Applying mirror.patch failed, so nothing was pushed."
+              return
+            fi
+            if ! git commit -q -m "$title"; then
+              needs_attention=1
+              reason="Committing the mirrored tree failed, so nothing was pushed."
+              return
+            fi
+            if [ -n "$remote_tip" ]; then
+              if ! git push --force-with-lease="sync/upstream:$remote_tip" origin sync/upstream; then
+                needs_attention=1
+                reason="Pushing sync/upstream failed; the lease refuses a branch that moved after this run read it."
+                return
+              fi
+            elif ! git push -u origin sync/upstream; then
+              needs_attention=1
+              reason="Pushing sync/upstream failed."
+              return
+            fi
+
+            if ! pr_body > "$body"; then
+              needs_attention=1
+              reason="Writing the sync PR body failed; the mirrored tree is on branch sync/upstream."
+              return
+            fi
+            if [ -n "$pr_number" ]; then
+              if ! gh pr edit "$pr_number" --title "$title" --body-file "$body"; then
+                needs_attention=1
+                reason="Editing the sync PR failed."
+                return
+              fi
+              if ! pr_url="$(gh pr view "$pr_number" --json url --jq .url)"; then
+                needs_attention=1
+                reason="Reading the sync PR URL failed."
+                return
+              fi
+            elif ! pr_url="$(gh pr create --base "$DEFAULT_BRANCH" --head sync/upstream --title "$title" --body-file "$body")"; then
+              needs_attention=1
+              reason="Creating the sync PR failed; the mirrored tree is on branch sync/upstream."
+              return
+            fi
+
+            if [ "${#failed_checks[@]}" -gt 0 ]; then
+              needs_attention=1
+              reason="Verification failed (${failed_checks[*]}); the PR stays open for a fix."
+              return
+            fi
+            if [ -n "$port_owned" ]; then
+              needs_attention=1
+              reason="Upstream changed port-owned files; review and merge by hand."$'\n\n'"$port_owned"
+              return
+            fi
+            if ! gh pr merge sync/upstream --squash --delete-branch --match-head-commit "$(git rev-parse HEAD)"; then
+              needs_attention=1
+              reason="Merging the verified sync PR failed."
             fi
           }
 
-          sync_one pstack
-          sync_one cursor-team-kit
-
-          if [ "$any_sync" -eq 0 ]; then
-            echo "ok: every component skipped"
-            exit 0
-          fi
-
-          # Refresh a bot-owned sync branch in place. A human commit means
-          # someone is mid-review, so report and leave the branch alone.
-          # That includes a closed PR whose branch is still on the remote.
-          pr_number="$(gh pr list --head sync/upstream --state open --json number --jq '.[0].number // empty')"
-          remote_tip="$(git ls-remote origin refs/heads/sync/upstream | awk '{print $1}')"
-          open_flag=0
-          remote_flag=0
-          authors=""
-          if [ -n "$pr_number" ]; then
-            open_flag=1
-          fi
-          if [ -n "$remote_tip" ]; then
-            remote_flag=1
-            # checkout is depth 1. A shallow log would only see the tip author
-            # and could hide a human commit under it. A bare branch name
-            # updates FETCH_HEAD only, and the author walk reads the
-            # remote-tracking refs.
-            if [ -f .git/shallow ]; then
-              git fetch --unshallow origin \
-                "+refs/heads/${DEFAULT_BRANCH}:refs/remotes/origin/${DEFAULT_BRANCH}" \
-                "+refs/heads/sync/upstream:refs/remotes/origin/sync/upstream"
-            else
-              git fetch origin \
-                "+refs/heads/${DEFAULT_BRANCH}:refs/remotes/origin/${DEFAULT_BRANCH}" \
-                "+refs/heads/sync/upstream:refs/remotes/origin/sync/upstream"
-            fi
-            authors="$(git log --format='%an' "origin/${DEFAULT_BRANCH}..origin/sync/upstream")"
-          fi
-          push_action="$(bun tools/sync-plan.mjs push "$(printf '%s\n%s\n%s\n' "$open_flag" "$remote_flag" "$authors")")"
-          if [ "$push_action" = "report-only" ]; then
-            echo "ok: sync/upstream has human commits; reporting only"
-            cat "$report"
-            exit 0
-          fi
-
-          set +e
-          bun tools/generate.mjs
-          gen_code=$?
-          set -e
-          if [ "$gen_code" -ne 0 ]; then
-            all_ok=0
-            printf '## generate\nexit: %s\n\n' "$gen_code" >> "$report"
-          fi
-
-          if git diff --quiet && git diff --cached --quiet && [ -z "$(git ls-files --others --exclude-standard)" ]; then
-            echo "ok: no diff after generate"
-            exit 0
-          fi
-
-          git checkout -B sync/upstream
-          git add -A
-          git commit -m "chore(sync): upstream pstack/cursor-team-kit"
-          if [ "$push_action" = "force-with-lease" ]; then
-            # The lease reads origin/sync/upstream. A bare branch name would
-            # update FETCH_HEAD only, so a raced push would not fail the lease.
-            git fetch origin "+refs/heads/sync/upstream:refs/remotes/origin/sync/upstream"
-            git push --force-with-lease origin sync/upstream
-          elif [ "$push_action" = "push" ]; then
-            git push -u origin sync/upstream
+          if [ "$MIRROR_RESULT" != "success" ] || ! [[ "$upstream_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            needs_attention=1
+            reason="The mirror job ended with result '$MIRROR_RESULT' or left no usable state, so nothing was landed."
           else
-            echo "unexpected push action: $push_action"
-            exit 1
+            case "$mirror_state" in
+              current)
+                echo "ok: upstream $upstream_sha is current"
+                if [ -n "$issue_number" ]; then
+                  gh issue close "$issue_number" --comment "Upstream is current at $upstream_sha; nothing to land."
+                fi
+                exit 0
+                ;;
+              failed)
+                needs_attention=1
+                reason="bun tools/sync.mjs failed, so nothing was landed."
+                ;;
+              changed)
+                land
+                ;;
+              *)
+                needs_attention=1
+                reason="The mirror state '$mirror_state' is unknown, so nothing was landed."
+                ;;
+            esac
           fi
 
-          body="$(mktemp)"
+          open_issue=0
+          if [ -n "$issue_number" ]; then
+            open_issue=1
+          fi
+          action="$(bun tools/sync-plan.mjs issue "$needs_attention" "$open_issue")"
+          issue_body="$RUNNER_TEMP/issue.md"
           {
-            printf '%s\n\n' "Automated upstream sync."
-            cat "$report"
-          } > "$body"
-          if [ -n "$pr_number" ]; then
-            gh pr edit "$pr_number" --body-file "$body"
-          else
-            set +e
-            gh pr create --base "$DEFAULT_BRANCH" --head sync/upstream --title "chore(sync): upstream pstack/cursor-team-kit" --body-file "$body"
-            pr_code=$?
-            set -e
-            if [ "$pr_code" -ne 0 ]; then
-              echo "pr create failed; branch remains sync/upstream"
-              all_ok=0
+            printf '%s\n\n- Run: %s\n' "$reason" "$run_url"
+            if [ -n "$pr_url" ]; then
+              printf -- '- PR: %s\n' "$pr_url"
             fi
-          fi
-          rm -f "$body"
-
-          verify_ok=1
-          set +e
-          bash tests/skill-collision-repro.sh || verify_ok=0
-          bun tools/generate.mjs && git diff --exit-code || verify_ok=0
-          bun test tests/ || verify_ok=0
-          (
-            cd plugins/pstack/skills/poteto-mode/scripts && bun install --frozen-lockfile && bun run typecheck && bun test orch watch-pr
-          ) || verify_ok=0
-          {
-            find . -path ./.git -prune -o -path '*/node_modules' -prune -o -name '*.sh' -print
-            grep -rlE --exclude-dir=.git --exclude-dir=node_modules '^#!/(usr/bin/env )?(ba)?sh' .
-          } | sed 's#^\./##' | sort -u | tee /dev/stderr | xargs shellcheck --severity=warning || verify_ok=0
-          set -e
-
-          if [ "$all_ok" -eq 1 ] && [ "$verify_ok" -eq 1 ]; then
-            gh pr merge sync/upstream --squash --delete-branch
-          else
-            echo "leaving PR open (all_ok=$all_ok verify_ok=$verify_ok)"
-          fi
+            printf '\n'
+            if [ -f "$summary" ]; then
+              cat "$summary"
+            fi
+            for component in "${components[@]}"; do
+              if [ -s "$reports/$component.err" ]; then
+                printf '### %s stderr (last 40 lines)\n\n```\n' "$component"
+                tail -n 40 "$reports/$component.err"
+                printf '```\n\n'
+              fi
+            done
+          } > "$issue_body"
+          case "$action" in
+            create) gh issue create --title "$issue_title" --body-file "$issue_body" ;;
+            update) gh issue edit "$issue_number" --body-file "$issue_body" ;;
+            close) gh issue close "$issue_number" --comment "Landed in $pr_url." ;;
+            none) ;;
+            *)
+              echo "unexpected issue action: $action"
+              exit 1
+              ;;
+          esac
+          echo "needs_attention=$needs_attention $reason"

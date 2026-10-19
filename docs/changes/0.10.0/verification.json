@@ -1,0 +1,81 @@
+{
+  "status": "PASS",
+  "version": "0.10.0",
+  "rootTests": {
+    "runtime": "Bun 1.3.14 (CI pin)",
+    "passed": 130,
+    "failed": 0,
+    "assertions": 337,
+    "files": 4
+  },
+  "vendoredTools": {
+    "frozenInstall": "no dependency or lockfile changes",
+    "typecheck": "PASS",
+    "passed": 55,
+    "failed": 0
+  },
+  "shellcheck": {
+    "scripts": 3,
+    "exitCode": 0
+  },
+  "commands": [
+    {
+      "check": "static invariants",
+      "command": [
+        "bash",
+        "tests/skill-collision-repro.sh"
+      ],
+      "exitCode": 0,
+      "output": "ok: no plugins/pstack/commands/ directory\nok: no skill carries disable-model-invocation: true\nok: principle-* leaves carry user-invocable: false and not disable-model-invocation\nok: Codex pstack dispatch uses the default agent with explicit policy\nok: comment-sicko prompt is not no-comments/SKILL.md\n"
+    },
+    {
+      "check": "diff whitespace",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "check": "workflow security",
+      "command": "uvx zizmor@1.29.0 --persona pedantic --min-severity low --collect all -- .",
+      "exitCode": 0,
+      "mode": "default offline",
+      "output": "No findings to report. Good job! (1 suppressed)\n INFO zizmor: 🌈 zizmor v1.29.0\n WARN audit: zizmor: zizmor is running in offline mode by default; some audits and auto-fixes will not be available. see https://docs.zizmor.sh/usage/#operating-modes for details\n INFO audit: zizmor: 🌈 completed ./.github/dependabot.yml\n INFO audit: zizmor: 🌈 completed ./.github/workflows/ci.yml\n INFO audit: zizmor: 🌈 completed ./.github/workflows/dependabot-lockfile.yml\n INFO audit: zizmor: 🌈 completed ./.github/workflows/security.yml\n INFO audit: zizmor: 🌈 completed ./.github/workflows/sync-upstream.yml\n"
+    }
+  ],
+  "upstream": {
+    "from": "12d587dfb20741cafc376c42c696c5f6e2a64487",
+    "to": "e43c7ee26e0038c6c1fa8380dd34ce86ff94cb2a",
+    "reviewedPaths": 16,
+    "adapted": 11,
+    "excluded": 5,
+    "pinAdvanced": true,
+    "written": []
+  },
+  "behavioralComparison": "3 scenarios, n=1 per arm; no statistical improvement or monetary savings claim",
+  "nativeProofs": "Luna/medium completed read; Sol/medium completed CLI change and exact byte checks; both MATCH after final receipt-boundary changes",
+  "globalConfiguration": "read only; no global install, push or deployment performed",
+  "review": {
+    "scope": "working-tree changes including untracked files against 6304662",
+    "model": "anthropic/claude-opus-5-5",
+    "effort": "high",
+    "lenses": [
+      "security",
+      "architecture",
+      "comment-sicko"
+    ],
+    "resolved": [
+      "dangling symlink writes",
+      "canonical upstream pin reachability",
+      "configuration provenance",
+      "native transcript scope and identity",
+      "escalation reads the native receipt and validates task classification",
+      "optional implementation default preserves legacy settings",
+      "adoption records and evidence artifacts"
+    ],
+    "remainingActionableFindings": []
+  }
+}
