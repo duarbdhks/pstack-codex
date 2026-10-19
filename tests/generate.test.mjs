@@ -74,7 +74,7 @@ describe("routing catalog generation", () => {
   test("profiles and role references are generated from a validated catalog", () => {
     expect(() => validateRoutingCatalog(models)).not.toThrow();
     const table = dispatchProfilesSection(models);
-    expect(table).toContain("| evidence | `gpt-6-luna` / `medium` | `gpt-6-luna` / `high` | `gpt-6.1-sol` / `high` |");
+    expect(table).toContain("| evidence | `gpt-6-luna` / `max` | `gpt-6-luna` / `max` | `gpt-6.1-sol` / `max` |");
     const missing = structuredClone(models);
     delete missing.codexRouting.profiles.evidence;
     expect(() => validateRoutingCatalog(missing)).toThrow("missing profile");

@@ -21,7 +21,7 @@ const catalog = JSON.parse(readFileSync(join(import.meta.dir, "../plugins/pstack
 
 const CONTRACT = {
   "gpt-6-luna": ["medium", "high", "max"],
-  "gpt-6.1-sol": ["medium", "high", "xhigh"],
+  "gpt-6.1-sol": ["medium", "high", "xhigh", "max"],
   "gpt-6-astra": ["high", "xhigh"],
   "xai/grok-4.7": ["high"],
 };
@@ -29,6 +29,8 @@ const LUNA_HIGH = { model: "gpt-6-luna", effort: "high" };
 const SOL_HIGH = { model: "gpt-6.1-sol", effort: "high" };
 const SOL_XHIGH = { model: "gpt-6.1-sol", effort: "xhigh" };
 const ASTRA_XHIGH = { model: "gpt-6-astra", effort: "xhigh" };
+const LUNA_MAX = { model: "gpt-6-luna", effort: "max" };
+const SOL_MAX = { model: "gpt-6.1-sol", effort: "max" };
 const OCX_OFF = { ok: false, reason: "OCX proxy is not running" };
 const OCX_ON = { ok: true, ...SOL_HIGH };
 const ROUTINE = { difficulty: "routine", failureCost: "low", reasoningDepth: "shallow" };
@@ -57,9 +59,9 @@ describe("models.json codexRouting", () => {
     expect(catalog.codexRouting).toEqual({
       version: 1,
       profiles: {
-        evidence: [{ model: "gpt-6-luna", effort: "medium" }, LUNA_HIGH, SOL_HIGH],
-        implementation: [{ model: "gpt-6.1-sol", effort: "medium" }, SOL_HIGH, { model: "gpt-6-astra", effort: "high" }],
-        judgment: [SOL_HIGH, { model: "gpt-6-astra", effort: "high" }, ASTRA_XHIGH],
+        evidence: [LUNA_MAX, LUNA_MAX, SOL_MAX],
+        implementation: [SOL_MAX, SOL_MAX, ASTRA_XHIGH],
+        judgment: [SOL_MAX, ASTRA_XHIGH, ASTRA_XHIGH],
       },
     });
     const profiles = Object.fromEntries(catalog.roles.map((r) => [r.role, r.profile]));
@@ -124,11 +126,7 @@ describe("adaptive tiers", () => {
     ["complex", "high", "standard", 2],
     ["complex", "high", "deep", 2],
   ];
-  const IMPLEMENTATION = [
-    { model: "gpt-6.1-sol", effort: "medium" },
-    SOL_HIGH,
-    { model: "gpt-6-astra", effort: "high" },
-  ];
+  const IMPLEMENTATION = [SOL_MAX, SOL_MAX, ASTRA_XHIGH];
 
   test("covers all 27 task combinations", () => {
     expect(new Set(TIERS.map((row) => row.slice(0, 3).join("/"))).size).toBe(27);
@@ -194,7 +192,7 @@ describe("resolveBatch", () => {
   test("an opted-in implementation default uses its own minimum tier", () => {
     const config = { ...SHEET, defaults: { ...SHEET.defaults, implementation: { source: "adaptive", profile: "implementation" } } };
     const result = resolve({ config, adaptiveAllowed: true, entries: [{ role: "hillclimb", task: ROUTINE }] });
-    expect(result.entries[0]).toMatchObject({ source: "adaptive", profile: "implementation", tier: 0, requested: { model: "gpt-6.1-sol", effort: "medium" } });
+    expect(result.entries[0]).toMatchObject({ source: "adaptive", profile: "implementation", tier: 0, requested: SOL_MAX });
   });
 
   test("an unknown role outside sheet and catalog is an error", () => {
@@ -277,7 +275,7 @@ describe("resolveBatch", () => {
       { contract: { "gpt-6.1-sol": ["high"] }, adaptiveAllowed: true, entries: [{ role: "bug-fix", task: ROUTINE }] },
       { catalog, ocx: () => OCX_OFF },
     );
-    expect(result.errors).toEqual(["entries[0]: adaptive implementation tier 0 gpt-6.1-sol/medium is not supported by the request contract"]);
+    expect(result.errors).toEqual(["entries[0]: adaptive implementation tier 0 gpt-6.1-sol/max is not supported by the request contract"]);
   });
 
   test("a sheet's source: adaptive needs adaptiveAllowed and may name a profile", () => {
@@ -286,7 +284,7 @@ describe("resolveBatch", () => {
       "entries[0]: adaptive selection requires adaptiveAllowed",
     ]);
     const allowed = resolve({ config: sheet, adaptiveAllowed: true, entries: [{ role: "how explorer", task: ROUTINE }] });
-    expect(allowed.entries[0]).toMatchObject({ source: "adaptive", profile: "judgment", tier: 0, requested: SOL_HIGH });
+    expect(allowed.entries[0]).toMatchObject({ source: "adaptive", profile: "judgment", tier: 0, requested: SOL_MAX });
     expect(resolve({ config: sheet, adaptiveAllowed: true, entries: [{ role: "how explorer" }] }).errors).toEqual([
       "entries[0]: adaptive selection requires task",
     ]);
@@ -357,7 +355,8 @@ describe("readOcx", () => {
 describe("escalate", () => {
   const THREAD = "01a106bb-5cf0-7fd3-8aaf-a4bab2d7db19";
   const TRANSCRIPT = "/sessions/rollout-x-" + THREAD + ".jsonl";
-  const receipt = resolve({ adaptiveAllowed: true, entries: [{ role: "bug-fix", task: ROUTINE, message: "fix it" }] }).entries[0];
+  // judgment's first two tiers differ, so a one-tier escalation is observable.
+  const receipt = resolve({ adaptiveAllowed: true, entries: [{ role: "judgment and prose", task: ROUTINE, message: "judge it" }] }).entries[0];
   const evidence = (actual = receipt.requested) => ({
     sessionsRoot: "/sessions", realPath: (path) => path,
     readText: () => JSON.stringify({ type: "session_meta", payload: { id: THREAD } }) + "\n" + JSON.stringify({ type: "turn_context", payload: actual }),
@@ -368,7 +367,7 @@ describe("escalate", () => {
   test("verifies the named native child, moves one tier up, and permits only one escalation", () => {
     const result = run(safe);
     expect(result.ok).toBe(true);
-    expect(result.receipt).toMatchObject({ tier: 1, escalation: 1, requested: SOL_HIGH, verifiedAttempt: { threadId: THREAD, actual: receipt.requested }, spawn: { model: "gpt-6.1-sol", reasoning_effort: "high", fork_turns: "none" } });
+    expect(result.receipt).toMatchObject({ tier: 1, escalation: 1, requested: ASTRA_XHIGH, verifiedAttempt: { threadId: THREAD, actual: receipt.requested }, spawn: { model: "gpt-6-astra", reasoning_effort: "xhigh", fork_turns: "none" } });
     expect(run({ ...safe, receipt: result.receipt }, SOL_HIGH).reasons).toEqual(["this selection was already escalated"]);
   });
 
@@ -554,7 +553,7 @@ describe("route.mjs CLI", () => {
     writeFileSync(policy, "# policy\n" + POLICY_MARKER + "\nsource: adaptive\n<!-- /pstack-routing:1 -->\n");
     const allowed = run(["resolve", "--policy", policy], adaptive, dir);
     expect(allowed.status).toBe(0);
-    expect(JSON.parse(allowed.stdout).entries[0]).toMatchObject({ source: "adaptive", tier: 0, requested: { model: "gpt-6.1-sol", effort: "medium" } });
+    expect(JSON.parse(allowed.stdout).entries[0]).toMatchObject({ source: "adaptive", tier: 0, requested: SOL_MAX });
   });
 
   test("a missing default sheet without adaptive authorization fails the batch", () => {

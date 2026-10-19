@@ -2,6 +2,10 @@
 
 This record preserves the historical port and the deliberate Codex-native changes. Shared workflow content mirrors upstream; native execution and routing are owned here.
 
+## 0.11.1 GPT-6 catalog and single-effort routing
+
+The model catalog drops Grok 4.6, GPT-5.5, and GPT-5.4; the remaining entries are the GPT-6 family, Claude Opus 5.5, Grok 4.7, and DeepSeek Flash. Each GPT-6 model now runs at one effort in the adaptive profiles. GPT-6 Luna and GPT-6.1 Sol use `max`, and GPT-6 Astra uses `xhigh`. Tiers that differed only by effort now share a pair, so a profile tier changes the model rather than the effort.
+
 ## 0.11.0 Upstream mirror
 
 pstack-codex now mirrors upstream pstack instead of selecting from it. This release catches up from upstream 0.15.9 (`e43c7ee`) to 0.15.27 (`7b353f7`). It updates 86 files and adds `/ketchup`, `/sharpen`, `/in-your-own-words`, `/poteto-help`, `/create-formal-verification-skill`, `/maintain-formal-verification-skill`, and the plan-check tests. Shared content that 0.10.0 had adapted or held back now matches upstream. The stale `poteto-mode/references/plan.md`, which upstream deleted earlier, is removed.

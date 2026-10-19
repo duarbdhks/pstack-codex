@@ -96,7 +96,7 @@ Tell the user where the override was written and which `CLAUDE.md` includes it. 
 
 Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`).
 
-- Available models: GPT-6 Astra (`gpt-6-astra`), GPT-6.1 Sol (`gpt-6.1-sol`), Claude Opus 5.5 (`anthropic/claude-opus-5-5`), GPT-6 Luna (`gpt-6-luna`), Grok 4.7 (`grok-4.7`), Grok 4.6 (`grok-4.6`), DeepSeek Flash (`deepseek-flash`), GPT-5.5 (`gpt-5.5`), GPT-5.4 (`gpt-5.4`)
+- Available models: GPT-6 Astra (`gpt-6-astra`), GPT-6.1 Sol (`gpt-6.1-sol`), Claude Opus 5.5 (`anthropic/claude-opus-5-5`), GPT-6 Luna (`gpt-6-luna`), Grok 4.7 (`grok-4.7`), DeepSeek Flash (`deepseek-flash`)
 - Default panel: `gpt-6-astra`, `gpt-6.1-sol`, `grok-4.7`
 - Single-role default: `gpt-6-astra`
 
