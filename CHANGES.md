@@ -2,6 +2,22 @@
 
 This record preserves the historical port and the deliberate Codex-native changes. Shared workflow content mirrors upstream; native execution and routing are owned here.
 
+## 0.11.2 upstream sync 88d4751 (pstack 0.15.29)
+
+### cursor-team-kit: current
+
+- 0 added, 0 updated, 0 deleted
+- port-owned files changed upstream: none
+- warnings: 0
+- compare: https://github.com/cursor/plugins/compare/e46364b8be46000b7df0f260550cd712afbb8d36...88d47514b82e7c44f00f2b2a72ff6dd12158038c
+
+### pstack: changed
+
+- 0 added, 3 updated, 0 deleted
+- port-owned files changed upstream: none
+- warnings: 3
+- compare: https://github.com/cursor/plugins/compare/7b353f78f6ec193bdbe48ed8059444eb09b6878e...88d47514b82e7c44f00f2b2a72ff6dd12158038c
+
 ## 0.11.1 GPT-6 catalog and single-effort routing
 
 The model catalog drops Grok 4.6, GPT-5.5, and GPT-5.4; the remaining entries are the GPT-6 family, Claude Opus 5.5, Grok 4.7, and DeepSeek Flash. Each GPT-6 model now runs at one effort in the adaptive profiles. GPT-6 Luna and GPT-6.1 Sol use `max`, and GPT-6 Astra uses `xhigh`. Tiers that differed only by effort now share a pair, so a profile tier changes the model rather than the effort.

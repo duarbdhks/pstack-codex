@@ -101,7 +101,7 @@ CI checks generated files, mirror parity with the pinned upstream, plugin invari
 | `/ketchup` | Catch the user up on what changed in this chat since their last message, in plain words and small visuals |
 | `/maintain-formal-verification-skill` | Bring a project's formal verification back in line with the code after the code changes: find the commits that touched verified code, update the model, harness, or properties to describe the code as it is now, rerun, and say whether each failure is drift in the verification or a bug in the code |
 | `/poteto-help` | Guides users through pstack setup, /poteto-mode, and picking the skill, playbook, or principle for a task |
-| `/sharpen` | Sharpen a task before starting: the expert approach, what the user is really after, and the right level of specification |
+| `/sharpen` | Make a task deeper, not bigger, then rewrite the prompt |
 
 ## License
 
