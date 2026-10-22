@@ -2,6 +2,22 @@
 
 This record preserves the historical port and the deliberate Codex-native changes. Shared workflow content mirrors upstream; native execution and routing are owned here.
 
+## 0.11.3 upstream sync eb4db2b (pstack 0.15.30)
+
+### cursor-team-kit: current
+
+- 0 added, 0 updated, 0 deleted
+- port-owned files changed upstream: none
+- warnings: 0
+- compare: https://github.com/cursor/plugins/compare/e46364b8be46000b7df0f260550cd712afbb8d36...eb4db2b55b2b7dec3d9282754cddf0a56bf4ff10
+
+### pstack: changed
+
+- 13 added, 1 updated, 0 deleted
+- port-owned files changed upstream: none
+- warnings: 3
+- compare: https://github.com/cursor/plugins/compare/88d47514b82e7c44f00f2b2a72ff6dd12158038c...eb4db2b55b2b7dec3d9282754cddf0a56bf4ff10
+
 ## 0.11.2 upstream sync 88d4751 (pstack 0.15.29)
 
 ### cursor-team-kit: current
