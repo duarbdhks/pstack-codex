@@ -1,6 +1,6 @@
 ---
 name: statechart
-description: "Draw what an app's user sees as a Mermaid statechart from a TLA+ model"
+description: "Draw how any system moves between states, such as a product flow, a protocol, or a service, as a Mermaid statechart from a TLA+ model"
 disable-model-invocation: true
 ---
 
