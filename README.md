@@ -99,6 +99,7 @@ CI checks generated files, mirror parity with the pinned upstream, plugin invari
 | `/create-formal-verification-skill` | Generate a project-local skill that formally verifies the code where a bug costs the most and tests reach the least, in any language, with whichever verification tool fits |
 | `/in-your-own-words` | Restate in your own words what you think the user's goals are and what problem they're trying to solve |
 | `/ketchup` | Catch the user up on what changed in this chat since their last message, in plain words and small visuals |
+| `/ketchup-video` | Catch the user up like /ketchup, with a short silent video of slides for what happened and the waiting calls as text under it |
 | `/maintain-formal-verification-skill` | Bring a project's formal verification back in line with the code after the code changes: find the commits that touched verified code, update the model, harness, or properties to describe the code as it is now, rerun, and say whether each failure is drift in the verification or a bug in the code |
 | `/poteto-help` | Guides users through pstack setup, /poteto-mode, and picking the skill, playbook, or principle for a task |
 | `/sharpen` | Make a task deeper, not bigger, then rewrite the prompt |
