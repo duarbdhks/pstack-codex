@@ -4,7 +4,7 @@
     "pstack": {
       "upstreamPath": "pstack",
       "localPath": "plugins/pstack",
-      "sha": "9580c23696ac8d7abed0c166f2f9918800afb819",
+      "sha": "164ced10fa576ddf91e1f03b4fa9d1183c8272fe",
       "exclude": [
         {
           "pathPrefix": "automations/",
