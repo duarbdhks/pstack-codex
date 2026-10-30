@@ -2,6 +2,22 @@
 
 This record preserves the historical port and the deliberate Codex-native changes. Shared workflow content mirrors upstream; native execution and routing are owned here.
 
+## 0.11.10 upstream sync 4dd1d05 (pstack 0.15.36)
+
+### cursor-team-kit: current
+
+- 0 added, 0 updated, 0 deleted
+- port-owned files changed upstream: none
+- warnings: 0
+- compare: https://github.com/cursor/plugins/compare/e46364b8be46000b7df0f260550cd712afbb8d36...4dd1d05818d19792e7cd6e818f1667f95f7e1dbe
+
+### pstack: changed
+
+- 0 added, 15 updated, 7 deleted
+- port-owned files changed upstream: `skills/setup-pstack/SKILL.md`
+- warnings: 16
+- compare: https://github.com/cursor/plugins/compare/519d36aa98955bf680db01bcde5fdfba686dc901...4dd1d05818d19792e7cd6e818f1667f95f7e1dbe
+
 ## 0.11.9 upstream sync 519d36a (pstack 0.15.34)
 
 ### cursor-team-kit: current
