@@ -13,7 +13,7 @@
 //     -> its "## Codex runtime" section
 //   plugins/pstack/models.json (catalog, role metadata, adaptive profiles)
 //     -> each model-consuming skill's "## Models" section
-//     -> setup-pstack's override-sheet block and interrogate's reviewer table
+//     -> setup-pstack's override-sheet block
 //     -> the "## Model names" section of poteto-mode/references/codex-tools.md
 //     -> routing profile docs, legacy mappings, and scripts/models.generated.json
 //   No model slug may appear in skill prose outside stamped regions; the scan
@@ -210,18 +210,6 @@ export function stampOverrideSheet(text, models, file) {
   return lines.join("\n");
 }
 
-export function stampReviewerTable(text, models, file) {
-  const lines = text.split("\n");
-  const header = lines.indexOf("| Subagent | Default model |");
-  if (header === -1) throw new Error(`${file}: no reviewer table header`);
-  let end = header + 2;
-  while (end < lines.length && lines[end].startsWith("| Reviewer ")) end++;
-  const reviewers = models.roles.find((r) => r.role === "interrogate reviewers").models;
-  const rows = reviewers.map((m, i) => `| Reviewer ${String.fromCharCode(65 + i)} | ${code(m)} |`);
-  lines.splice(header + 2, end - header - 2, ...rows);
-  return lines.join("\n");
-}
-
 function ocxSlug(canonical) {
   return `ocx-${canonical.replaceAll(".", "-")}`;
 }
@@ -410,13 +398,9 @@ function main() {
   let modelStamps = 0;
   for (const [skill, roles] of bySkill) {
     const path = join(skillsDir, skill, "SKILL.md");
-    let text = readFileSync(path, "utf8");
-    if (skill === "interrogate") {
-      text = stampReviewerTable(text, models, path);
-    } else {
-      text = upsertSection(text, "Models", modelsSection(roles, skill));
-    }
-    if (stampFile(path, text, `skills/${skill}/SKILL.md (models)`)) modelStamps++;
+    const text = readFileSync(path, "utf8");
+    const next = upsertSection(text, "Models", modelsSection(roles, skill));
+    if (stampFile(path, next, `skills/${skill}/SKILL.md (models)`)) modelStamps++;
   }
   {
     const path = join(skillsDir, "setup-pstack/SKILL.md");
