@@ -55,7 +55,7 @@ Preview is the default. `--apply` writes the mirror and advances the pin. Port-o
 - `plugins/pstack/models.json` owns model metadata, role names, and adaptive profiles. `tools/generate.mjs` produces the bundled catalog and model documentation from it.
 - Public skill frontmatter owns Codex prompt descriptions and the command table below.
 - `tests/` checks routing, mirror sync, generation, and plugin invariants with positive and negative fixtures.
-- `poteto-mode/scripts/` ships the resolver, PR watcher, orchestration store, and worktree audit. Existing script dependencies stay pinned by `bun.lock`.
+- `poteto-mode/scripts/` ships the resolver, PR watcher, and worktree audit. Existing script dependencies stay pinned by `bun.lock`.
 
 CI checks generated files, mirror parity with the pinned upstream, plugin invariants, Bun tests, vendored TypeScript tools, shell scripts, pinned actions, and workflow security. The scheduled upstream mirror is separate from release CI.
 

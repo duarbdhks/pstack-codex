@@ -6,6 +6,8 @@ This record preserves the historical port and the deliberate Codex-native change
 
 The generator stamps `interrogate` role defaults through the shared Models section, so the table-free upstream skill keeps its Codex routing and runtime contract.
 
+Codex mappings cover Orchestrate's project state, worker handoffs, and bounded PR watchers while keeping routing checks mandatory. Removed `orch` descriptions and aligned the legacy setup guidance with the new cross-family judge rule.
+
 ### cursor-team-kit: current
 
 - 0 added, 0 updated, 0 deleted

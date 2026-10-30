@@ -50,7 +50,7 @@ The default role-to-model mapping is shown in step 5 below. If `~/.claude/pstack
 
 ### 3. Map and confirm
 
-Show every role with its current model, marking any real slug without direct or external availability as needing a choice. Ask whether to accept as-is or change specific roles, offering the detected models plus `inherit-parent` and `auto` as the options. Prefer `AskUserQuestion` over free text. For panel roles (arena runners, architect runners, interrogate reviewers) the value is a list, and one subagent runs per entry, alias entries included, so the list length sets the count. Arena selects one model from `arena cross-judge pool`, whose default is Astra. `swarm workers` is the default model for every worker unless a race or comparison assigns another model per arm.
+Show every role with its current model, marking any real slug without direct or external availability as needing a choice. Ask whether to accept as-is or change specific roles, offering the detected models plus `inherit-parent` and `auto` as the options. Prefer `AskUserQuestion` over free text. For panel roles (arena runners, architect runners, interrogate reviewers) the value is a list, and one subagent runs per entry, alias entries included, so the list length sets the count. Arena runs one judge from `arena cross-judge pool`, whose default is Astra, trying entries from a different family than the parent's in pool order. `inherit-parent` and `auto` never judge; report when no cross-family judge can run. `swarm workers` is the default model for every worker unless a race or comparison assigns another model per arm.
 
 ### 4. Validate
 

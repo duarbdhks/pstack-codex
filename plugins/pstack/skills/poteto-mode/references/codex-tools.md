@@ -20,6 +20,9 @@ The tool list of the current turn is the only source of truth. Availability chan
 | Cloud agent (`Cursor cloud agent`) | a local `spawn_agent` child working in its own git worktree | one sequential pass, stated in the report |
 | Wait for, message, close a subagent | the wait, message and close tools in the list (names differ by version, e.g. `wait_agent`, `send_input`, `close_agent`) | none |
 | Track tasks (`TodoWrite`) | `update_plan` | a short plan in commentary |
+| Project tracker (`notes.md`) and Project store | the listed task tracker and file tools | keep program notes and artifacts in a dedicated temporary directory outside the user's checkout |
+| Fork another worker's built state | message that worker for follow-up work; spawn a fresh child with explicit worktree and artifact pointers for independent work | transfer file-based results; `fork_turns` copies the caller's context, not another worker's checkout or running process |
+| PR and CI event subscriptions | the listed forge event or wait tool | use a bounded `gh pr checks --watch` or vendored `watch-pr` run |
 | Fixed-choice question (`AskQuestion`/`AskUserQuestion`) | `request_user_input` or its async variant (`request_user_input_async`) | ask in the final message and stop on that question |
 | Drive a CLI or TUI (`control-cli`) | `exec_command` with a PTY session; type with `write_stdin` | run the command non-interactively |
 | Drive a UI (`control-ui`) | the listed browser or computer-use tools | report the gap |
@@ -31,6 +34,8 @@ The tool list of the current turn is the only source of truth. Availability chan
 | Recurring re-run (`loop`) | app automations (heartbeat) when listed | re-run the step yourself |
 
 Never skip a repository's git hooks (`--no-verify`). Do not edit the user's Codex config to enable a missing tool; report it.
+
+Orchestrate's "call no scripts" rule does not suppress the Codex routing resolver or receipt checks. When event subscriptions are absent, the bounded watcher fallback above is allowed; do not add an unbounded polling loop.
 
 ## Subagent policy
 
@@ -86,7 +91,7 @@ Some upstream triggers name Claude Code built-ins. On Codex:
 
 ## Vendored scripts
 
-`skills/poteto-mode/scripts/` ships `watch-pr`, the `orch` store CLI, `worktree-audit.sh` and the `route.mjs` routing CLI. Run them with `exec_command`. The routing helper needs Bun. Existing watcher/store commands use their vendored Bun dependencies; stack work also needs `gh` and `gt`. `worktree-audit.sh` uses `jq` and `rg` and currently reads Claude Code history. On Codex, absent native chat evidence is a gap; do not treat its legacy recent-chat classification as proof that a worktree is unused.
+`skills/poteto-mode/scripts/` ships `watch-pr`, `worktree-audit.sh` and the `route.mjs` routing CLI. Run them with `exec_command`. The routing helper needs Bun. Existing watcher commands use their vendored Bun dependencies; stack work also needs `gh` and `gt`. `worktree-audit.sh` uses `jq` and `rg` and currently reads Claude Code history. On Codex, absent native chat evidence is a gap; do not treat its legacy recent-chat classification as proof that a worktree is unused.
 
 ## Instructions file
 
