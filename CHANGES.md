@@ -4,6 +4,8 @@ This record preserves the historical port and the deliberate Codex-native change
 
 ## 0.11.10 upstream sync 4dd1d05 (pstack 0.15.36)
 
+The generator stamps `interrogate` role defaults through the shared Models section, so the table-free upstream skill keeps its Codex routing and runtime contract.
+
 ### cursor-team-kit: current
 
 - 0 added, 0 updated, 0 deleted

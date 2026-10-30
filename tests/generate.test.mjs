@@ -99,8 +99,15 @@ describe("routing catalog generation", () => {
     const changed = JSON.parse(readFileSync(modelPath, "utf8"));
     changed.codexRouting.profiles.implementation[0].effort = "high";
     writeFileSync(modelPath, JSON.stringify(changed));
+    const interrogatePath = join(fixture, "plugins/pstack/skills/interrogate/SKILL.md");
+    writeFileSync(interrogatePath, "---\nname: interrogate\ndescription: Review a change.\n---\n\n# Interrogate\n\nUse arena with the interrogate reviewers role.\n");
     const generate = () => execFileSync(process.execPath, ["tools/generate.mjs"], { cwd: fixture, stdio: ["ignore", "pipe", "pipe"] });
     generate();
+    const interrogate = readFileSync(interrogatePath, "utf8");
+    expect(interrogate).toContain("- interrogate reviewers: `gpt-6.1-sol`, `grok-4.7`");
+    expect(interrogate).toContain("[Codex spawn contract](../poteto-mode/references/codex-tools.md#codex-spawn-contract)");
+    expect(interrogate).toContain("## Codex runtime");
+    expect(interrogate).not.toContain("| Subagent | Default model |");
     const bundled = join(fixture, "plugins/pstack/skills/poteto-mode/scripts/models.generated.json");
     expect(JSON.parse(readFileSync(bundled, "utf8"))).toEqual(changed);
     expect(readFileSync(join(fixture, "plugins/pstack/skills/poteto-mode/references/codex-routing.md"), "utf8")).toContain("| implementation | `gpt-6.1-sol` / `high`");

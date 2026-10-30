@@ -159,3 +159,7 @@ On Codex, dispatch each role below with the [Codex spawn contract](references/co
 - hillclimb: `gpt-6.1-sol`
 - judgment and prose: `gpt-6-astra`
 - strongest judgment: `gpt-6-astra`
+
+## Codex runtime
+
+On Codex, use the native execution contract in [codex-tools.md](references/codex-tools.md). Before delegation, read [Codex routing](references/codex-routing.md), resolve the configured model and effort with its executable helper, and pass both to the active spawn tool. Upstream tool, path, and model names in this skill map through that contract; a `<role model>` placeholder is the role's routed model. Other runtimes use [legacy-tools.md](references/legacy-tools.md). Where a step here says to omit `model`, run on the parent model, or fall back to another slug after a rejection, the Codex spawn contract wins: resolve the pair or stop before spawning.
