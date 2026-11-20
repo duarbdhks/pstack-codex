@@ -43,6 +43,12 @@
       "rationale": "exit before starting a worker on native Windows"
     },
     {
+      "path": "skills/statechart/scripts/statechart.ts",
+      "pattern": "    const running = worker.exitCode === null && worker.signalCode === null;\n    const groupOutlivesWorker = process.platform !== \"win32\";\n    if (worker.pid !== undefined && (running || groupOutlivesWorker)) await killGroup(worker.pid);",
+      "replacement": "    if (worker.pid !== undefined) await killGroup(worker.pid);",
+      "rationale": "the native Windows guard leaves CLI runs that can always reap the worker group"
+    },
+    {
       "pattern": "~/.cursor/rules/pstack-models.mdc",
       "replacement": "~/.codex/pstack-models.md",
       "rationale": "the Codex model override sheet written by /setup-pstack"

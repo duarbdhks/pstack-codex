@@ -134,9 +134,7 @@ try {
       }),
     );
     await Promise.race([stopped, exited]);
-    const running = worker.exitCode === null && worker.signalCode === null;
-    const groupOutlivesWorker = process.platform !== "win32";
-    if (worker.pid !== undefined && (running || groupOutlivesWorker)) await killGroup(worker.pid);
+    if (worker.pid !== undefined) await killGroup(worker.pid);
     const verdict = await exited;
     if (stop) {
       console.error(`${stop} stopped the check, so the command wrote nothing.`);
