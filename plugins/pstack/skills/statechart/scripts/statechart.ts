@@ -7,6 +7,12 @@ import { parseArgs } from "node:util";
 import { killGroup } from "./kill.ts";
 import { messageOf } from "./run.ts";
 
+// shortcut: use WSL until the CLI can clean up Java after a Windows worker exits unexpectedly
+if (process.platform === "win32") {
+  console.error("Run statechart in WSL on Windows.");
+  process.exit(2);
+}
+
 const USAGE = `Usage: statechart SPEC.tla [--config FILE] [--view FILE] [--out DIR]
 
 Checks SPEC.tla with TLC and draws its state graph as Mermaid. Above 500 states, the chart
