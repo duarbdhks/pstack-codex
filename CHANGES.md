@@ -2,6 +2,22 @@
 
 This record preserves the historical port and the deliberate Codex-native changes. Shared workflow content mirrors upstream; native execution and routing are owned here.
 
+## 0.11.11 upstream sync aaeb0ea (pstack 0.15.46)
+
+### cursor-team-kit: current
+
+- 0 added, 0 updated, 0 deleted
+- port-owned files changed upstream: none
+- warnings: 0
+- compare: https://github.com/cursor/plugins/compare/e46364b8be46000b7df0f260550cd712afbb8d36...aaeb0ea3a0584995aa8f55ce44c6c5259414b896
+
+### pstack: changed
+
+- 4 added, 65 updated, 24 deleted
+- port-owned files changed upstream: `skills/setup-pstack/SKILL.md`
+- warnings: 20
+- compare: https://github.com/cursor/plugins/compare/4dd1d05818d19792e7cd6e818f1667f95f7e1dbe...aaeb0ea3a0584995aa8f55ce44c6c5259414b896
+
 ## 0.11.10 upstream sync 4dd1d05 (pstack 0.15.36)
 
 The generator stamps `interrogate` role defaults through the shared Models section, so the table-free upstream skill keeps its Codex routing and runtime contract.

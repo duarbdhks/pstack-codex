@@ -119,7 +119,8 @@ const tally = (counts, key, n) => counts.set(key, (counts.get(key) ?? 0) + n);
 
 function renderTarget(raw, rel, local, rules, counts) {
   if (isBinary(rel, raw)) return raw;
-  const substituted = applySubstitutions(raw.toString("utf8"), rules);
+  const applicableRules = rules.filter((rule) => rule.path === undefined || rule.path === rel);
+  const substituted = applySubstitutions(raw.toString("utf8"), applicableRules);
   substituted.counts.forEach((n, pattern) => tally(counts, pattern, n));
   let text = substituted.text;
   if (rel.endsWith(".md")) {

@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { execFileSync, spawnSync } from "node:child_process";
 import { applySubstitutions, denylistHits, main, parseSyncArgs, syncComponent } from "../tools/sync.mjs";
 
@@ -188,6 +189,25 @@ describe("mirror sync", () => {
     expect(read(localDir, "skills/principle-x/SKILL.md")).toBe("---\nname: principle-x\ndescription: a fresh principle\nuser-invocable: false\n---\n\nPrinciple body.\n");
   });
 
+  test("scoped rules match the exact local path after remapping", () => {
+    const localDir = tree({});
+    const target = "skills/a/notes.md";
+    const other = "skills/b/notes.md";
+    syncComponent({
+      oldDir: tree({}),
+      newDir: tree({ "original.md": "Cursor default\n", [other]: "Cursor default\n" }),
+      localDir,
+      remap: [{ from: "original.md", to: target }],
+      rules: [
+        { path: target, pattern: "default", replacement: "override" },
+        { pattern: "Cursor", replacement: "Codex" },
+      ],
+      apply: true,
+    });
+    expect(read(localDir, target)).toBe("Codex override\n");
+    expect(read(localDir, other)).toBe("Codex default\n");
+  });
+
   test.each([
     ["scripts/engine.wasm", Buffer.from([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00])],
     ["scripts/blob.dat", Buffer.from([0xff, 0xfe, 0x80])],
@@ -198,6 +218,52 @@ describe("mirror sync", () => {
     expect(readFileSync(join(localDir, rel))).toEqual(payload);
     expect(report).toMatchObject({ changes: [{ path: rel, kind: "added" }], warnings: [] });
     expect(report.counts.size).toBe(0);
+  });
+});
+
+describe("Codex port", () => {
+  const skills = join(import.meta.dir, "../plugins/pstack/skills");
+
+  test("mirrored skills select roles through the Codex router", () => {
+    const poteto = read(skills, "poteto-mode/SKILL.md");
+    expect(poteto).toContain("pass the returned `model` and `reasoning_effort` unchanged");
+    expect(poteto).not.toContain("# defaults: 3");
+    expect(poteto).not.toContain("No role runs above xhigh");
+    const arena = read(skills, "arena/SKILL.md");
+    expect(arena).toContain("Resolve `arena runners`");
+    expect(arena).toContain("Resolve `arena cross-judge pool`");
+    expect(arena).not.toContain("gemini-4-neon-xhigh");
+    expect(read(skills, "how/SKILL.md")).toContain("Spawn one `how explainer`");
+  });
+
+  test("statechart directs native Windows users to WSL before starting work", () => {
+    const scratch = tree({ "Model.tla": "", "Model.cfg": "" });
+    try {
+      const entry = join(skills, "statechart/scripts/statechart.ts");
+      const probe = `
+        import { syncBuiltinESMExports } from "node:module";
+        require("node:child_process").spawn = () => { throw new Error("unexpected worker spawn"); };
+        syncBuiltinESMExports();
+        Object.defineProperty(process, "platform", { value: "win32" });
+        await import(${JSON.stringify(pathToFileURL(entry).href)});
+      `;
+      const result = spawnSync(process.execPath, ["--eval", probe, "Model.tla", "--out", "out"], {
+        cwd: scratch,
+        env: { ...process.env, TMPDIR: scratch, TEMP: scratch, TMP: scratch },
+        encoding: "utf8",
+        timeout: 5000,
+      });
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(2);
+      expect(result.stderr).toBe("Run statechart in WSL on Windows.\n");
+      expect(result.stdout).toBe("");
+      expect(readdirSync(scratch).sort()).toEqual(["Model.cfg", "Model.tla"]);
+      const guidance = read(skills, "statechart/SKILL.md");
+      expect(guidance).toContain('sh "<skill dir>/scripts/statechart"');
+      expect(guidance).toContain("On Windows, run the command in WSL.");
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
   });
 });
 

@@ -12,10 +12,10 @@ The chart shows how a system moves between states, in the words of the person wh
 Work in a scratch folder outside the repo. Write a TLA+ spec and its config. Then run:
 
 ```sh
-<skill dir>/scripts/statechart SPEC.tla [--config FILE] [--view FILE] [--out DIR]
+sh "<skill dir>/scripts/statechart" SPEC.tla [--config FILE] [--view FILE] [--out DIR]
 ```
 
-`scripts/statechart.ts` is TypeScript, so run it with a runtime that can execute TypeScript.
+The POSIX launcher selects a TypeScript runtime. On Windows, run the command in WSL.
 
 The first run installs TLC and Java with mise and needs the network.
 
